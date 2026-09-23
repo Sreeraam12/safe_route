@@ -26,11 +26,14 @@ async def main():
 
     print("\nCalculating final routes...")
 
+    from datetime import datetime
+
     routes = await calculate_final_route_scores(
         graph=GRAPH,
         source_node=SOURCE_NODE,
         destination_node=DESTINATION_NODE,
         risk_data=risk_data,
+        travel_datetime=datetime.now(),
         num_candidates=20,
         top_k=5,
     )

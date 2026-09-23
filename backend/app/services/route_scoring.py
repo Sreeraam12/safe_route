@@ -1,3 +1,4 @@
+from datetime import datetime
 import pandas as pd
 
 
@@ -33,11 +34,23 @@ def get_route_edges(graph, route):
     return pd.DataFrame(edges)
 
 
-def score_route(graph, route, risk_data):
+from backend.app.services.time_risk_engine import (
+    calculate_time_context,
+    compute_time_aware_segment_risk,
+)
+
+def score_route(
+    graph,
+    route,
+    risk_data,
+    travel_datetime=None,
+):
     """
-    Calculate distance-weighted SafeRoute risk
+    Calculate distance-weighted, time-aware SafeRoute risk
     for one candidate route.
     """
+    if travel_datetime is None:
+        travel_datetime = datetime.now()
 
     route_edges = get_route_edges(
         graph,
@@ -49,6 +62,13 @@ def score_route(graph, route, risk_data):
             "No valid edges found for route."
         )
 
+    time_ctx = calculate_time_context(travel_datetime)
+
+    available_env_cols = [
+        col for col in ["lighting_score", "isolation_score", "crowd_score"]
+        if col in risk_data.columns
+    ]
+
     risk_columns = [
         "u",
         "v",
@@ -56,7 +76,7 @@ def score_route(graph, route, risk_data):
         "osm_segment_id",
         "length",
         "hybrid_risk_100",
-    ]
+    ] + available_env_cols
 
     risk_lookup = risk_data[risk_columns].copy()
 
@@ -86,8 +106,7 @@ def score_route(graph, route, risk_data):
         axis=1,
     )
 
-    # Only matched segments contribute to the
-    # SafeRoute risk calculation.
+    # Only matched segments contribute to the SafeRoute risk calculation.
     matched = merged[
         merged["hybrid_risk_100"].notna()
     ].copy()
@@ -99,7 +118,21 @@ def score_route(graph, route, risk_data):
             "Invalid route length."
         )
 
+    # Compute time-aware contextual risk per segment
+    matched["time_aware_risk_100"] = compute_time_aware_segment_risk(
+        matched,
+        time_ctx,
+    )
+
     route_risk = (
+        (
+            matched["time_aware_risk_100"]
+            * matched["edge_length"]
+        ).sum()
+        / total_length
+    )
+
+    base_hybrid_risk = (
         (
             matched["hybrid_risk_100"]
             * matched["edge_length"]
@@ -119,6 +152,9 @@ def score_route(graph, route, risk_data):
         ),
         "route_risk": route_risk,
         "safety_score": float(safety_score),
+        "base_hybrid_risk": float(base_hybrid_risk),
+        "time_risk": float(time_ctx["base_time_risk"]),
+        "time_period": time_ctx["period"],
         "matched_segments": matched_segments,
         "total_segments": total_segments,
         "coverage_pct": float(
@@ -133,6 +169,7 @@ def score_candidate_routes(
     graph,
     candidate_routes,
     risk_data,
+    travel_datetime=None,
 ):
     """
     Score all candidate routes.
@@ -146,6 +183,7 @@ def score_candidate_routes(
             graph,
             candidate["route"],
             risk_data,
+            travel_datetime=travel_datetime,
         )
 
         scored_routes.append(

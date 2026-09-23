@@ -18,6 +18,8 @@ from backend.app.services.traffic_engine import (
 )
 
 
+from datetime import datetime
+
 async def fetch_traffic_point(point):
     traffic = await get_traffic(
         point["latitude"],
@@ -30,14 +32,21 @@ async def fetch_traffic_point(point):
     }
 
 
+from backend.app.services.time_risk_engine import calculate_time_context
+from backend.app.services.personal_twin_engine import calculate_personalized_route_risk
+
 async def calculate_final_route_scores(
     graph,
     source_node,
     destination_node,
     risk_data,
+    travel_datetime=None,
+    twin_weights=None,
     num_candidates=20,
     top_k=5,
 ):
+    if travel_datetime is None:
+        travel_datetime = datetime.now()
 
     print(
         "[SafeRoute] Generating candidate routes...",
@@ -66,6 +75,7 @@ async def calculate_final_route_scores(
         graph,
         candidates,
         risk_data,
+        travel_datetime=travel_datetime,
     )
 
     print(
@@ -74,6 +84,7 @@ async def calculate_final_route_scores(
     )
 
     final_routes = []
+    time_ctx = calculate_time_context(travel_datetime)
 
     for route_number, route_data in enumerate(
         scored_routes,
@@ -143,6 +154,21 @@ async def calculate_final_route_scores(
 
         final_safety = 100.0 - final_risk
 
+        # Personal Twin calculation if user weights available
+        personal_metrics = None
+        if twin_weights:
+            personal_metrics = calculate_personalized_route_risk(
+                base_time_aware_risk=final_risk,
+                matched_segments_df=matched_segments,
+                twin_weights=twin_weights,
+                time_context=time_ctx,
+            )
+            pers_risk = personal_metrics["personalized_risk"]
+            pers_safety = personal_metrics["personalized_safety_score"]
+        else:
+            pers_risk = final_risk
+            pers_safety = final_safety
+
         final_routes.append({
             "route_index":
                 route_data["route_index"],
@@ -158,6 +184,15 @@ async def calculate_final_route_scores(
 
             "hybrid_safety":
                 route_data["safety_score"],
+
+            "base_hybrid_risk":
+                route_data.get("base_hybrid_risk", hybrid_risk),
+
+            "time_risk":
+                route_data.get("time_risk", 0.0),
+
+            "time_period":
+                route_data.get("time_period", "normal"),
 
             "traffic_risk":
                 traffic_risk,
@@ -188,6 +223,15 @@ async def calculate_final_route_scores(
             "final_safety_score":
                 final_safety,
 
+            "personalized_risk":
+                pers_risk,
+
+            "personalized_safety_score":
+                pers_safety,
+
+            "personal_adjustment":
+                personal_metrics["personal_adjustment"] if personal_metrics else 0.0,
+
             "risk_coverage_pct":
                 route_data[
                     "coverage_pct"
@@ -200,9 +244,9 @@ async def calculate_final_route_scores(
     )
 
     final_routes.sort(
-        key=lambda route: (
-            -route["final_safety_score"],
-            route["distance_km"],
+        key=lambda r: (
+            -r["personalized_safety_score"],
+            r["distance_km"],
         )
     )
 

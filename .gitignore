@@ -8,6 +8,8 @@ venv/
 
 # FastAPI
 .pytest_cache/
+*.db
+backend/saferoute.db
 
 # Node / Next.js
 node_modules/

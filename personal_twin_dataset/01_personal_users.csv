@@ -1,0 +1,6 @@
+user_id,age_group,gender,occupation_type,default_travel_mode,mobility_category
+usr_arch_safety_01,25-34,Female,IT Professional,driving,Standard
+usr_arch_time_02,18-24,Female,Student,driving,Standard
+usr_arch_balanced_03,35-44,Female,Healthcare,driving,Standard
+usr_arch_night_04,25-34,Female,Media,driving,Standard
+usr_arch_weather_05,45-54,Female,Education,driving,Standard

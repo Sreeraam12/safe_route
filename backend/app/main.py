@@ -1,22 +1,33 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.db.session import init_db
 from backend.app.api.routes import router as routes_router
+from backend.app.api.auth import router as auth_router, user_router
+from backend.app.api.trips import router as trips_router
+from backend.app.api.navigation import router as navigation_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize database tables on startup
+    await init_db()
+    yield
 
 
 app = FastAPI(
     title="Safe Route API",
-    description="Chennai Safe Route Prediction API",
     version="0.1.0",
+    description="Chennai Safe Route Prediction, Personal Digital Twin & Live Navigation API",
+    lifespan=lifespan,
 )
 
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -24,7 +35,11 @@ app.add_middleware(
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {"status": "ok", "service": "SafeRoute API"}
 
 
 app.include_router(routes_router)
+app.include_router(auth_router)
+app.include_router(user_router)
+app.include_router(trips_router)
+app.include_router(navigation_router)

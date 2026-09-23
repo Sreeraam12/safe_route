@@ -1,7 +1,7 @@
 import pandas as pd
 
 from fastapi import APIRouter, HTTPException
-
+from datetime import datetime
 from backend.app.schemas.route import (
     GeocodeRequest,
     GeocodeResponse,
@@ -56,47 +56,45 @@ async def geocode(
     return result
 
 
+from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Depends
+from backend.app.db.session import get_db
+from backend.app.api.deps import get_optional_user
+from backend.app.models.user import User
+from backend.app.services.personal_twin_engine import get_effective_twin_weights
+
 @router.post("/search")
 async def search_route(
     request: RouteSearchRequest,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    # -----------------------------------------------------
-    # 1. Geocode source
-    # -----------------------------------------------------
 
-    source = await geocode_place(
-        request.source
-    )
+    source = await geocode_place(request.source)
 
     if source is None:
         raise HTTPException(
             status_code=404,
-            detail=(
-                f"Source place not found: "
-                f"{request.source}"
-            ),
+            detail=f"Source place not found: {request.source}",
         )
 
-    # -----------------------------------------------------
-    # 2. Geocode destination
-    # -----------------------------------------------------
-
-    destination = await geocode_place(
-        request.destination
-    )
+    destination = await geocode_place(request.destination)
 
     if destination is None:
         raise HTTPException(
             status_code=404,
-            detail=(
-                f"Destination place not found: "
-                f"{request.destination}"
-            ),
+            detail=f"Destination place not found: {request.destination}",
         )
 
-    # -----------------------------------------------------
-    # 3. Find nearest OSM nodes
-    # -----------------------------------------------------
+    now = datetime.now()
+    travel_date = request.travel_date or now.date()
+    travel_time = request.travel_time or now.time().replace(second=0, microsecond=0)
+
+    travel_datetime = datetime.combine(
+        travel_date,
+        travel_time,
+    )
 
     route_data = get_shortest_route(
         source["latitude"],
@@ -104,28 +102,27 @@ async def search_route(
         destination["latitude"],
         destination["longitude"],
     )
-
-    source_node = route_data[
-        "source_node"
-    ]
-
-    destination_node = route_data[
-        "destination_node"
-    ]
+    source_node = route_data["source_node"]
+    destination_node = route_data["destination_node"]
 
     # -----------------------------------------------------
     # 4. Generate + score Top 5 routes
     # -----------------------------------------------------
 
-    ranked_routes = (
-        await calculate_final_route_scores(
-            graph=route_data["graph"],
-            source_node=source_node,
-            destination_node=destination_node,
-            risk_data=RISK_DATA,
-            num_candidates=20,
-            top_k=5,
-        )
+    twin_weights = await get_effective_twin_weights(
+        current_user.id if current_user else None,
+        db,
+    )
+
+    ranked_routes = await calculate_final_route_scores(
+        graph=route_data["graph"],
+        source_node=source_node,
+        destination_node=destination_node,
+        risk_data=RISK_DATA,
+        travel_datetime=travel_datetime,
+        twin_weights=twin_weights,
+        num_candidates=20,
+        top_k=5,
     )
 
     # -----------------------------------------------------
@@ -158,11 +155,29 @@ async def search_route(
             "safety_score":
                 route["final_safety_score"],
 
+            "personalized_risk":
+                route.get("personalized_risk", route["final_risk"]),
+
+            "personalized_safety_score":
+                route.get("personalized_safety_score", route["final_safety_score"]),
+
+            "personal_adjustment":
+                route.get("personal_adjustment", 0.0),
+
             "hybrid_risk":
                 route["hybrid_risk"],
 
             "hybrid_safety":
                 route["hybrid_safety"],
+
+            "base_hybrid_risk":
+                route.get("base_hybrid_risk", route["hybrid_risk"]),
+
+            "time_risk":
+                route.get("time_risk", 0.0),
+
+            "time_period":
+                route.get("time_period", "normal"),
 
             "traffic_risk":
                 route["traffic_risk"],

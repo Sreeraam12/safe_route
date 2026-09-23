@@ -1,15 +1,23 @@
+from pathlib import Path
 import osmnx as ox
 import networkx as nx
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+GRAPH_CACHE = BASE_DIR / "artifacts" / "chennai_drive.graphml.xml"
+if not GRAPH_CACHE.exists():
+    GRAPH_CACHE = BASE_DIR / "artifacts" / "chennai_drive.graphml"
 
 # Load Chennai driving network once when the backend starts.
-print("Loading Chennai road network...")
-
-GRAPH = ox.graph_from_place(
-    "Chennai, Tamil Nadu, India",
-    network_type="drive",
-    simplify=True,
-)
+if GRAPH_CACHE.exists():
+    print(f"Loading Chennai road network from local cache: {GRAPH_CACHE.name}...")
+    GRAPH = ox.load_graphml(str(GRAPH_CACHE))
+else:
+    print("Loading Chennai road network from OSM...")
+    GRAPH = ox.graph_from_place(
+        "Chennai, Tamil Nadu, India",
+        network_type="drive",
+        simplify=True,
+    )
 
 print(
     f"Chennai road network loaded: "

@@ -1,0 +1,31 @@
+trip_id,user_id,trip_datetime,travel_date,travel_time,source_zone,destination_zone,travel_mode,trip_intent,selected_route_id,selected_distance_km,selected_duration_min,selected_safety_score,actual_distance_km,actual_duration_min,route_deviation_pct,weather_condition,traffic_condition,completed
+trip_usr_arch_safety_01_1,usr_arch_safety_01,2026-09-01T08:30:00,2026-09-01,08:30,Chennai Central,Marina Beach,driving,Commute,0,4.69,13.1,76.7,4.69,13.1,0.0,Clear,Moderate,True
+trip_usr_arch_safety_01_2,usr_arch_safety_01,2026-09-04T12:30:00,2026-09-04,12:30,T Nagar,Adyar,driving,Personal,0,9.74,27.3,77.8,9.74,27.3,0.0,Clear,Moderate,True
+trip_usr_arch_safety_01_3,usr_arch_safety_01,2026-09-07T12:30:00,2026-09-07,12:30,Guindy,Velachery,driving,Commute,0,9.78,27.4,72.8,9.78,27.4,0.0,Clear,Moderate,True
+trip_usr_arch_safety_01_4,usr_arch_safety_01,2026-09-10T12:30:00,2026-09-10,12:30,Anna Nagar,Nungambakkam,driving,Personal,0,7.97,22.3,76.6,7.97,22.3,0.0,Clear,Moderate,True
+trip_usr_arch_safety_01_5,usr_arch_safety_01,2026-09-13T12:30:00,2026-09-13,12:30,Mylapore,Besant Nagar,driving,Commute,0,6.49,18.2,76.2,6.49,18.2,0.0,Clear,Moderate,True
+trip_usr_arch_safety_01_6,usr_arch_safety_01,2026-09-16T22:30:00,2026-09-16,22:30,Chennai Central,Marina Beach,driving,Personal,0,8.47,23.7,88.5,8.47,23.7,0.0,Dry Night,Moderate,True
+trip_usr_arch_time_02_1,usr_arch_time_02,2026-09-01T19:30:00,2026-09-01,19:30,Chennai Central,Marina Beach,driving,Commute,0,10.81,30.3,80.6,10.81,30.3,0.0,Dry Night,Moderate,True
+trip_usr_arch_time_02_2,usr_arch_time_02,2026-09-04T08:30:00,2026-09-04,08:30,T Nagar,Adyar,driving,Personal,0,9.99,28.0,85.9,9.99,28.0,0.0,Clear,Moderate,True
+trip_usr_arch_time_02_3,usr_arch_time_02,2026-09-07T22:30:00,2026-09-07,22:30,Guindy,Velachery,driving,Commute,0,11.25,31.5,79.7,11.25,31.5,0.0,Dry Night,Moderate,True
+trip_usr_arch_time_02_4,usr_arch_time_02,2026-09-10T12:30:00,2026-09-10,12:30,Anna Nagar,Nungambakkam,driving,Personal,0,10.38,29.1,85.7,10.38,29.1,0.0,Clear,Moderate,True
+trip_usr_arch_time_02_5,usr_arch_time_02,2026-09-13T12:30:00,2026-09-13,12:30,Mylapore,Besant Nagar,driving,Commute,0,6.59,18.5,76.2,6.59,18.5,0.0,Clear,Moderate,True
+trip_usr_arch_time_02_6,usr_arch_time_02,2026-09-16T08:30:00,2026-09-16,08:30,Chennai Central,Marina Beach,driving,Personal,0,11.89,33.3,76.5,11.89,33.3,0.0,Clear,Moderate,True
+trip_usr_arch_balanced_03_1,usr_arch_balanced_03,2026-09-01T08:30:00,2026-09-01,08:30,Chennai Central,Marina Beach,driving,Commute,0,11.71,32.8,73.4,11.71,32.8,0.0,Clear,Moderate,True
+trip_usr_arch_balanced_03_2,usr_arch_balanced_03,2026-09-04T19:30:00,2026-09-04,19:30,T Nagar,Adyar,driving,Personal,0,7.47,20.9,83.4,7.47,20.9,0.0,Dry Night,Moderate,True
+trip_usr_arch_balanced_03_3,usr_arch_balanced_03,2026-09-07T08:30:00,2026-09-07,08:30,Guindy,Velachery,driving,Commute,0,9.51,26.6,81.4,9.51,26.6,0.0,Clear,Moderate,True
+trip_usr_arch_balanced_03_4,usr_arch_balanced_03,2026-09-10T08:30:00,2026-09-10,08:30,Anna Nagar,Nungambakkam,driving,Personal,0,9.26,25.9,86.1,9.26,25.9,0.0,Clear,Moderate,True
+trip_usr_arch_balanced_03_5,usr_arch_balanced_03,2026-09-13T12:30:00,2026-09-13,12:30,Mylapore,Besant Nagar,driving,Commute,0,4.81,13.5,78.2,4.81,13.5,0.0,Clear,Moderate,True
+trip_usr_arch_balanced_03_6,usr_arch_balanced_03,2026-09-16T22:30:00,2026-09-16,22:30,Chennai Central,Marina Beach,driving,Personal,0,4.69,13.1,84.5,4.69,13.1,0.0,Dry Night,Moderate,True
+trip_usr_arch_night_04_1,usr_arch_night_04,2026-09-01T12:30:00,2026-09-01,12:30,Chennai Central,Marina Beach,driving,Commute,0,4.68,13.1,75.3,4.68,13.1,0.0,Clear,Moderate,True
+trip_usr_arch_night_04_2,usr_arch_night_04,2026-09-04T19:30:00,2026-09-04,19:30,T Nagar,Adyar,driving,Personal,0,9.96,27.9,77.3,9.96,27.9,0.0,Dry Night,Moderate,True
+trip_usr_arch_night_04_3,usr_arch_night_04,2026-09-07T19:30:00,2026-09-07,19:30,Guindy,Velachery,driving,Commute,0,9.48,26.5,74.1,9.48,26.5,0.0,Dry Night,Moderate,True
+trip_usr_arch_night_04_4,usr_arch_night_04,2026-09-10T22:30:00,2026-09-10,22:30,Anna Nagar,Nungambakkam,driving,Personal,0,10.39,29.1,82.3,10.39,29.1,0.0,Dry Night,Moderate,True
+trip_usr_arch_night_04_5,usr_arch_night_04,2026-09-13T12:30:00,2026-09-13,12:30,Mylapore,Besant Nagar,driving,Commute,0,4.68,13.1,76.2,4.68,13.1,0.0,Clear,Moderate,True
+trip_usr_arch_night_04_6,usr_arch_night_04,2026-09-16T22:30:00,2026-09-16,22:30,Chennai Central,Marina Beach,driving,Personal,0,4.88,13.7,76.2,4.88,13.7,0.0,Dry Night,Moderate,True
+trip_usr_arch_weather_05_1,usr_arch_weather_05,2026-09-01T22:30:00,2026-09-01,22:30,Chennai Central,Marina Beach,driving,Commute,0,6.44,18.0,76.2,6.44,18.0,0.0,Dry Night,Moderate,True
+trip_usr_arch_weather_05_2,usr_arch_weather_05,2026-09-04T19:30:00,2026-09-04,19:30,T Nagar,Adyar,driving,Personal,0,8.57,24.0,79.1,8.57,24.0,0.0,Dry Night,Moderate,True
+trip_usr_arch_weather_05_3,usr_arch_weather_05,2026-09-07T22:30:00,2026-09-07,22:30,Guindy,Velachery,driving,Commute,0,6.15,17.2,79.4,6.15,17.2,0.0,Dry Night,Moderate,True
+trip_usr_arch_weather_05_4,usr_arch_weather_05,2026-09-10T19:30:00,2026-09-10,19:30,Anna Nagar,Nungambakkam,driving,Personal,0,7.34,20.6,75.6,7.34,20.6,0.0,Dry Night,Moderate,True
+trip_usr_arch_weather_05_5,usr_arch_weather_05,2026-09-13T12:30:00,2026-09-13,12:30,Mylapore,Besant Nagar,driving,Commute,0,10.79,30.2,82.6,10.79,30.2,0.0,Clear,Moderate,True
+trip_usr_arch_weather_05_6,usr_arch_weather_05,2026-09-16T22:30:00,2026-09-16,22:30,Chennai Central,Marina Beach,driving,Personal,0,11.56,32.4,75.4,11.56,32.4,0.0,Dry Night,Moderate,True

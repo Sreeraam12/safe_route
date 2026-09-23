@@ -1,0 +1,62 @@
+{
+  "generated_at": "2026-09-23T00:13:26.398906",
+  "results": [
+    {
+      "Condition": "Baseline Shortest Path",
+      "Departure Time": "12:00 PM (Neutral)",
+      "Twin Profile": "None (Unpersonalized)",
+      "Distance (km)": 4.18,
+      "Detour (%)": 0.0,
+      "Risk Score": 34.31,
+      "Safety Score": 65.69,
+      "Safety Gain (%)": 0.0,
+      "Latency (ms)": 18.5
+    },
+    {
+      "Condition": "Static SafeRoute (Daytime)",
+      "Departure Time": "12:00 PM",
+      "Twin Profile": "None (Global)",
+      "Distance (km)": 5.331763703602933,
+      "Detour (%)": 27.6,
+      "Risk Score": 31.038902826653885,
+      "Safety Score": 68.96109717334612,
+      "Safety Gain (%)": 5.0,
+      "Latency (ms)": 31068.23
+    },
+    {
+      "Condition": "Time-Aware SafeRoute (Late Night)",
+      "Departure Time": "11:30 PM",
+      "Twin Profile": "None (Global)",
+      "Distance (km)": 5.331763703602933,
+      "Detour (%)": 27.6,
+      "Risk Score": 45.78604568379676,
+      "Safety Score": 54.21395431620324,
+      "Safety Gain (%)": -17.5,
+      "Latency (ms)": 24262.12
+    },
+    {
+      "Condition": "Twin: Safety-First Archetype",
+      "Departure Time": "11:30 PM",
+      "Twin Profile": "Safety First (Weights: 0.95)",
+      "Distance (km)": 5.331763703602933,
+      "Detour (%)": 27.6,
+      "Risk Score": 50.37,
+      "Safety Score": 49.63,
+      "Safety Gain (%)": -24.4,
+      "Latency (ms)": 57551.17
+    },
+    {
+      "Condition": "Twin: Time-Sensitive Archetype",
+      "Departure Time": "11:30 PM",
+      "Twin Profile": "Time Sensitive (Detour: 0.20)",
+      "Distance (km)": 5.331763703602933,
+      "Detour (%)": 27.6,
+      "Risk Score": 45.87,
+      "Safety Score": 54.13,
+      "Safety Gain (%)": -17.6,
+      "Latency (ms)": 0.0
+    }
+  ],
+  "dynamic_rerouting_latency_ms": 39104.0,
+  "corridor": "Chennai Central -> Marina Beach"
+}

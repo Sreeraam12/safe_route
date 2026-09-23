@@ -1,0 +1,6 @@
+user_id,lighting_preference,crowd_preference,isolation_aversion,cctv_preference,police_proximity_preference,main_road_preference,crime_sensitivity,traffic_tolerance,distance_priority,time_priority,detour_tolerance,night_safety_weight,weather_sensitivity
+usr_arch_safety_01,0.9,0.85,0.95,0.8,0.75,0.9,0.95,0.4,0.2,0.3,0.85,0.95,0.5
+usr_arch_time_02,0.5,0.4,0.5,0.4,0.3,0.6,0.5,0.7,0.9,0.95,0.2,0.5,0.3
+usr_arch_balanced_03,0.7,0.6,0.7,0.6,0.6,0.7,0.7,0.5,0.5,0.5,0.5,0.7,0.5
+usr_arch_night_04,0.95,0.9,0.95,0.85,0.8,0.95,0.9,0.4,0.3,0.35,0.75,0.99,0.6
+usr_arch_weather_05,0.8,0.65,0.75,0.6,0.6,0.85,0.75,0.4,0.4,0.4,0.6,0.75,0.95
