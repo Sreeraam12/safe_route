@@ -347,6 +347,9 @@ export default function Home() {
         <TripFeedbackModal
           tripId={completedTripId}
           onClose={() => setCompletedTripId(null)}
+          onFeedbackSubmitted={() => {
+            setShowDashboardModal(true);
+          }}
         />
       )}
     </main>

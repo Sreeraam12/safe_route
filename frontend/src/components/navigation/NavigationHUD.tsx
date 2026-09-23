@@ -22,7 +22,6 @@ export default function NavigationHUD({
   const [navStatus, setNavStatus] = useState<NavigationStatus | null>(null);
   const [simulating, setSimulating] = useState(false);
   const [simStepIndex, setSimStepIndex] = useState(0);
-  const [isOffRouteAlert, setIsOffRouteAlert] = useState(false);
   const [isReroutingAlert, setIsReroutingAlert] = useState(false);
 
   const routeGeometry = route.geometry;
@@ -50,11 +49,18 @@ export default function NavigationHUD({
       });
 
       setNavStatus(status);
-      setIsOffRouteAlert(status.off_route);
       setIsReroutingAlert(status.rerouting);
 
       if (status.new_route) {
         onRouteUpdated(status.new_route);
+      }
+
+      if (status.is_at_destination) {
+        if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+        setSimulating(false);
+        setTimeout(() => {
+          handleEndTrip();
+        }, 1200);
       }
     } catch (err) {
       console.error("GPS update error:", err);
@@ -72,9 +78,15 @@ export default function NavigationHUD({
 
       simIntervalRef.current = setInterval(() => {
         idx += 1;
-        if (idx >= routeGeometry.length) {
+        if (idx >= routeGeometry.length - 1) {
           if (simIntervalRef.current) clearInterval(simIntervalRef.current);
           setSimulating(false);
+          const [destLon, destLat] = routeGeometry[routeGeometry.length - 1];
+          onUserLocationUpdate([destLat, destLon]);
+          sendGPS(destLat, destLon, 0.0);
+          setTimeout(() => {
+            handleEndTrip();
+          }, 1200);
           return;
         }
 
@@ -110,8 +122,16 @@ export default function NavigationHUD({
 
   return (
     <div className="absolute left-5 right-5 top-5 z-[1000] mx-auto max-w-lg space-y-3">
+      {/* Destination Reached Alert */}
+      {navStatus?.is_at_destination && (
+        <div className="flex items-center gap-2 rounded-xl bg-emerald-600 p-3 text-xs font-semibold text-white shadow-lg animate-pulse">
+          <span>🏁</span>
+          <span>You have reached your destination! Completing trip & opening feedback...</span>
+        </div>
+      )}
+
       {/* Off-Route / Re-routing Warning Alert */}
-      {isReroutingAlert && (
+      {isReroutingAlert && !navStatus?.is_at_destination && (
         <div className="flex items-center gap-2 rounded-xl bg-amber-500 p-3 text-xs font-semibold text-white shadow-lg animate-pulse">
           <span>🔄</span>
           <span>Off-route detected. Automatically calculating new safe route from current position...</span>
@@ -194,4 +214,3 @@ export default function NavigationHUD({
     </div>
   );
 }
-

@@ -108,13 +108,21 @@ export interface NavigationStatus {
 
 export interface TripFeedbackItem {
   id: string;
+  id: string | number;
   safety_rating: number;
   comfort_rating: number;
   lighting_rating: number;
   crowd_rating: number;
+  comfort_rating?: number | null;
+  lighting_rating?: number | null;
+  crowd_rating?: number | null;
+  navigation_rating?: number | null;
   felt_unsafe: boolean;
   incident_reported: boolean;
   feedback_text?: string;
+  incident_reported?: boolean;
+  incident_type?: string | null;
+  feedback_text?: string | null;
   created_at: string;
 }
 

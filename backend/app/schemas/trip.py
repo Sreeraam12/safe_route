@@ -60,6 +60,14 @@ class TripFeedbackResponse(BaseModel):
     incident_reported: bool
     felt_unsafe: bool
     feedback_text: Optional[str]
+    comfort_rating: Optional[int] = None
+    lighting_rating: Optional[int] = None
+    crowd_rating: Optional[int] = None
+    navigation_rating: Optional[int] = None
+    incident_reported: bool = False
+    incident_type: Optional[str] = None
+    felt_unsafe: bool = False
+    feedback_text: Optional[str] = None
     created_at: datetime
 
     class Config:

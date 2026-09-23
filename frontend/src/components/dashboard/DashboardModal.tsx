@@ -220,10 +220,11 @@ export default function DashboardModal({ onClose }: DashboardModalProps) {
                                 {"☆".repeat(5 - trip.feedback.safety_rating)}
                               </span>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 text-[11px] text-gray-500 mt-2">
-                              <div>Comfort: {trip.feedback.comfort_rating}/5</div>
-                              <div>Lighting: {trip.feedback.lighting_rating}/5</div>
-                              <div>Crowd: {trip.feedback.crowd_rating}/5</div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-gray-600 mt-2 bg-white/70 p-2 rounded-lg border border-gray-100">
+                              <div>Comfort: <span className="font-semibold text-gray-800">{trip.feedback.comfort_rating != null ? `${trip.feedback.comfort_rating}/5` : "N/A"}</span></div>
+                              <div>Lighting: <span className="font-semibold text-gray-800">{trip.feedback.lighting_rating != null ? `${trip.feedback.lighting_rating}/5` : "N/A"}</span></div>
+                              <div>Crowd: <span className="font-semibold text-gray-800">{trip.feedback.crowd_rating != null ? `${trip.feedback.crowd_rating}/5` : "N/A"}</span></div>
+                              <div>Navigation: <span className="font-semibold text-gray-800">{trip.feedback.navigation_rating != null ? `${trip.feedback.navigation_rating}/5` : "N/A"}</span></div>
                             </div>
                             {trip.feedback.feedback_text && (
                               <p className="mt-2 text-gray-700 italic border-t border-gray-200/60 pt-1.5">

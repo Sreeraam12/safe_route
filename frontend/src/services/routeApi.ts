@@ -191,7 +191,20 @@ export async function createTrip(payload: any) {
   return response.json();
 }
 
-export async function submitTripFeedback(tripId: string, feedback: any) {
+export async function submitTripFeedback(
+  tripId: string,
+  feedback: {
+    safety_rating: number;
+    comfort_rating?: number;
+    lighting_rating?: number;
+    crowd_rating?: number;
+    navigation_rating?: number;
+    felt_unsafe?: boolean;
+    incident_reported?: boolean;
+    incident_type?: string;
+    feedback_text?: string;
+  }
+) {
   const response = await fetch(`${getApiUrl()}/api/trips/${tripId}/feedback`, {
     method: "POST",
     headers: {

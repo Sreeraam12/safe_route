@@ -173,20 +173,61 @@ async def learn_from_trip_feedback(
     learning_rate = 0.05
 
     # If user felt unsafe or reported low safety
+    # 1. Safety & Danger Perception
     if feedback.felt_unsafe or feedback.safety_rating <= 2:
         twin.crime_weight = float(np.clip(twin.crime_weight + learning_rate * 1.5, 0.0, 1.0))
         twin.isolation_weight = float(np.clip(twin.isolation_weight + learning_rate * 1.5, 0.0, 1.0))
         twin.detour_tolerance = float(np.clip(twin.detour_tolerance + 0.05, 0.10, 0.50))
+    elif feedback.safety_rating >= 4 and not feedback.felt_unsafe:
+        twin.model_confidence = float(np.clip(twin.model_confidence + 0.04, 0.10, 0.95))
 
     # If user specifically complained about lighting
     if feedback.lighting_rating and feedback.lighting_rating <= 2:
         twin.lighting_weight = float(np.clip(twin.lighting_weight + learning_rate * 2.0, 0.0, 1.0))
+    # 2. Lighting Quality Feedback
+    if feedback.lighting_rating is not None:
+        if feedback.lighting_rating <= 2:
+            # Low lighting reported: increase priority on well-lit paths
+            twin.lighting_weight = float(np.clip(twin.lighting_weight + learning_rate * 2.0, 0.0, 1.0))
+            twin.night_weight = float(np.clip(twin.night_weight + learning_rate * 1.0, 0.0, 1.0))
+        elif feedback.lighting_rating >= 4:
+            # Satisfactory lighting
+            twin.lighting_weight = float(np.clip(twin.lighting_weight - learning_rate * 0.5, 0.10, 1.0))
 
     # If user felt very safe and comfortable
     if feedback.safety_rating >= 4 and not feedback.felt_unsafe:
         twin.model_confidence = float(np.clip(twin.model_confidence + 0.03, 0.10, 0.95))
     else:
         twin.model_confidence = float(np.clip(twin.model_confidence + 0.02, 0.10, 0.95))
+    # 3. Comfort & Road Surface Feedback
+    if feedback.comfort_rating is not None:
+        if feedback.comfort_rating <= 2:
+            # Congested or rough corridor: increase traffic aversion and detour tolerance for smoother roads
+            twin.traffic_weight = float(np.clip(twin.traffic_weight + learning_rate * 1.5, 0.0, 1.0))
+            twin.detour_tolerance = float(np.clip(twin.detour_tolerance + 0.03, 0.10, 0.50))
+        elif feedback.comfort_rating >= 4:
+            # Comfortable ride
+            twin.traffic_weight = float(np.clip(twin.traffic_weight - learning_rate * 0.5, 0.05, 1.0))
+
+    # 4. Crowd & Bystander Activity Feedback
+    if feedback.crowd_rating is not None:
+        if feedback.crowd_rating <= 2:
+            # Deserted/isolated street: increase crowd priority and isolation aversion
+            twin.crowd_weight = float(np.clip(twin.crowd_weight + learning_rate * 1.8, 0.0, 1.0))
+            twin.isolation_weight = float(np.clip(twin.isolation_weight + learning_rate * 1.2, 0.0, 1.0))
+        elif feedback.crowd_rating >= 4:
+            # Active and bustling street confirmed
+            twin.crowd_weight = float(np.clip(twin.crowd_weight + learning_rate * 0.5, 0.0, 1.0))
+
+    # 5. Navigation & Guidance Accuracy Feedback
+    if feedback.navigation_rating is not None:
+        if feedback.navigation_rating <= 2:
+            # Complex/confusing turns: prioritize more direct routes
+            twin.distance_weight = float(np.clip(twin.distance_weight + learning_rate * 1.0, 0.0, 1.0))
+            twin.detour_tolerance = float(np.clip(twin.detour_tolerance - 0.03, 0.10, 0.50))
+
+    # General confidence increase per validated trip
+    twin.model_confidence = float(np.clip(twin.model_confidence + 0.02, 0.10, 0.95))
 
     twin.timestamp = datetime.utcnow()
     await db.commit()
