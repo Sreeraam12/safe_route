@@ -11,6 +11,7 @@ import LoginPage, { SafeRouteLogo } from "../components/auth/LoginPage";
 import PreferencesModal from "../components/preferences/PreferencesModal";
 import TripFeedbackModal from "../components/feedback/TripFeedbackModal";
 import DashboardModal from "../components/dashboard/DashboardModal";
+import EmergencyModal from "../components/emergency/EmergencyModal";
 
 import type { RouteSearchResponse, RouteResult, UserProfile } from "../types/route";
 import { getMe, createTrip, startNavigation } from "../services/routeApi";
@@ -43,6 +44,7 @@ export default function Home() {
   // Modals
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
   const [showDashboardModal, setShowDashboardModal] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
 
   // Live Navigation State
   const [isNavigating, setIsNavigating] = useState(false);
@@ -244,6 +246,15 @@ export default function Home() {
             <span>🧬</span> Twin
           </button>
 
+          {/* Profile & Trusted Contacts Button */}
+          <button
+            onClick={() => setShowEmergencyModal(true)}
+            className="rounded-xl bg-red-50 px-2.5 py-1.5 font-bold text-red-700 hover:bg-red-100 transition flex items-center gap-1.5 border border-red-200"
+            title="Profile, Trusted Contacts & Emergency SOS Logs"
+          >
+            <span>🛡️</span> Profile & Contacts
+          </button>
+
           {/* Sign Out Logo Button */}
           <button
             onClick={handleLogout}
@@ -342,6 +353,12 @@ export default function Home() {
           onClose={() => setShowDashboardModal(false)}
         />
       )}
+
+      <EmergencyModal
+        isOpen={showEmergencyModal}
+        onClose={() => setShowEmergencyModal(false)}
+        user={user}
+      />
 
       {completedTripId && (
         <TripFeedbackModal

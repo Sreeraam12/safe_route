@@ -7,6 +7,7 @@ from backend.app.db.session import get_db
 from backend.app.core.security import hash_password, verify_password, create_access_token
 from backend.app.models.user import User, PersonalPreferences
 from backend.app.models.twin import PersonalTwinState
+from backend.app.models.trusted_contact import TrustedContact
 from backend.app.schemas.user import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -65,6 +66,32 @@ async def register(
         model_confidence=0.10,
     )
     db.add(twin)
+
+    # Optional Trusted Contacts during registration
+    if getattr(request, "trusted_contact_name", None) and getattr(request, "trusted_contact_phone", None):
+        db.add(
+            TrustedContact(
+                owner_user_id=user.id,
+                name=request.trusted_contact_name.strip(),
+                phone_number=request.trusted_contact_phone.strip(),
+                relationship=(getattr(request, "trusted_contact_relationship", None) or "Family").strip(),
+                is_verified=True,
+                is_active=True,
+            )
+        )
+    if getattr(request, "trusted_contacts", None):
+        for tc in request.trusted_contacts:
+            if isinstance(tc, dict) and (tc.get("name") or tc.get("contact_name")) and tc.get("phone_number"):
+                db.add(
+                    TrustedContact(
+                        owner_user_id=user.id,
+                        name=str(tc.get("contact_name") or tc.get("name")).strip(),
+                        phone_number=str(tc.get("phone_number")).strip(),
+                        relationship=str(tc.get("relationship") or "Family").strip(),
+                        is_verified=True,
+                        is_active=True,
+                    )
+                )
 
     await db.commit()
     await db.refresh(user)
