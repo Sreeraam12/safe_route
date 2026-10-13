@@ -19,6 +19,7 @@ class RouteInteractionCreate(BaseModel):
     selected: bool = False
     rejected: bool = False
     rejection_reason: Optional[str] = None
+    osm_segment_ids: List[str] = []
 
 
 class TripCreateRequest(BaseModel):
@@ -38,6 +39,7 @@ class TripCreateRequest(BaseModel):
     selected_safety_score: float
     weather_condition: Optional[str] = None
     traffic_condition: Optional[str] = None
+    selected_segment_ids: List[str] = []
     interactions: List[RouteInteractionCreate] = []
 
 

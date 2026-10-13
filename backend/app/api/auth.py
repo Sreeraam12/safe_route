@@ -197,3 +197,52 @@ async def get_my_twin_state(
         await db.refresh(twin)
     return twin
 
+
+@user_router.get("/me/segment-memory")
+async def get_my_segment_memory(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns personal segment memory statistics and active remembered corridors.
+    """
+    from backend.app.models.twin import PersonalSegmentMemory
+    res = await db.execute(
+        select(PersonalSegmentMemory).where(PersonalSegmentMemory.user_id == current_user.id)
+    )
+    memories = res.scalars().all()
+
+    familiar = [m for m in memories if m.visit_count >= 2 or m.trust_score >= 0.65]
+    avoided = [m for m in memories if m.avoidance_score >= 0.35 or m.rejection_count >= 3]
+
+    sorted_trusted = sorted(memories, key=lambda m: (-m.trust_score, -m.visit_count))[:10]
+    sorted_avoided = sorted(memories, key=lambda m: (-m.avoidance_score, -m.rejection_count))[:10]
+
+    return {
+        "user_id": current_user.id,
+        "total_remembered_corridors": len(memories),
+        "familiar_corridors_count": len(familiar),
+        "avoided_corridors_count": len(avoided),
+        "top_trusted_corridors": [
+            {
+                "osm_segment_id": m.osm_segment_id,
+                "visit_count": m.visit_count,
+                "selection_count": m.selection_count,
+                "trust_score": m.trust_score,
+                "personal_risk_adjustment": m.personal_risk_adjustment,
+                "last_visit": m.last_visit.isoformat() if m.last_visit else None,
+            }
+            for m in sorted_trusted if m.trust_score > 0.5 or m.visit_count > 0
+        ],
+        "top_avoided_corridors": [
+            {
+                "osm_segment_id": m.osm_segment_id,
+                "rejection_count": m.rejection_count,
+                "negative_feedback_count": m.negative_feedback_count,
+                "avoidance_score": m.avoidance_score,
+                "personal_risk_adjustment": m.personal_risk_adjustment,
+            }
+            for m in sorted_avoided if m.avoidance_score > 0.1 or m.rejection_count > 0
+        ],
+    }
+

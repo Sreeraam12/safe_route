@@ -26,6 +26,10 @@ export interface RouteResult {
   traffic_total_segments: number;
   geometry: [number, number][];
   road_names: string[];
+  osm_segment_ids?: string[];
+  familiar_segments_count?: number;
+  avoided_segments_count?: number;
+  segment_memory_adjustment?: number;
   instructions: RouteInstruction[];
 }
 

@@ -109,7 +109,30 @@ async def manual_reroute(
 
 
 @router.post("/end")
-async def end_navigation(trip_id: str):
+async def end_navigation(
+    trip_id: str,
+    db: AsyncSession = Depends(get_db),
+):
     session = end_navigation_session(trip_id)
+
+    # Mark trip complete and record physical traversal in Personal Segment Memory
+    try:
+        from sqlalchemy import select
+        from backend.app.models.trip import Trip
+        import json
+        from backend.app.services.segment_memory_service import record_trip_traversal
+
+        res = await db.execute(select(Trip).where(Trip.id == trip_id))
+        trip = res.scalar_one_or_none()
+        if trip:
+            trip.completed = True
+            if trip.user_id and trip.traversed_segment_ids:
+                segments = json.loads(trip.traversed_segment_ids)
+                if isinstance(segments, list) and segments:
+                    await record_trip_traversal(trip.user_id, segments, db)
+            await db.commit()
+    except Exception as e:
+        print(f"[SafeRoute Navigation End Error] {e}")
+
     return {"status": "ended", "trip_id": trip_id}
 

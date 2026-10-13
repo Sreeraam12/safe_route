@@ -217,6 +217,22 @@ export async function submitTripFeedback(
   return response.json();
 }
 
+export async function completeTrip(tripId: string) {
+  try {
+    const response = await fetch(`${getApiUrl()}/api/trips/${tripId}/complete`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeader(),
+      },
+    });
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function getTripHistory(): Promise<import("../types/route").TripHistoryItem[]> {
   const response = await fetch(`${getApiUrl()}/api/trips/history`, {
     headers: {
@@ -304,5 +320,19 @@ export async function fetchActiveAlertsForMe() {
     return response.json();
   } catch {
     return { alerts: [] };
+  }
+}
+
+export async function getSegmentMemory() {
+  try {
+    const response = await fetch(`${getApiUrl()}/api/users/me/segment-memory`, {
+      headers: {
+        ...getAuthHeader(),
+      },
+    });
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
   }
 }

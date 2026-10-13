@@ -37,6 +37,7 @@ class Trip(Base):
     traffic_condition = Column(String(100), nullable=True)
 
     completed = Column(Boolean, default=False, nullable=False)
+    traversed_segment_ids = Column(Text, nullable=True)  # JSON-encoded list of OSM segment IDs
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="trips")
@@ -68,6 +69,7 @@ class RouteInteraction(Base):
     selected = Column(Boolean, default=False)
     rejected = Column(Boolean, default=False)
     rejection_reason = Column(String(255), nullable=True)
+    osm_segment_ids = Column(Text, nullable=True)  # JSON-encoded list of candidate OSM segment IDs
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

@@ -54,6 +54,36 @@ def get_road_name(graph, u, v):
     return str(name)
 
 
+def get_segment_id(data, u, v):
+    if not data:
+        return f"{u}_{v}"
+    osmid = data.get("osmid")
+    if osmid:
+        if isinstance(osmid, list):
+            return str(osmid[0])
+        elif isinstance(osmid, str) and osmid.startswith("["):
+            clean = osmid.strip("[]'\" ").split(",")[0].strip(" '\"")
+            if clean:
+                return clean
+        return str(osmid)
+    return f"{u}_{v}"
+
+
+def get_route_segment_ids(graph, route):
+    """
+    Return unique ordered list of OSM segment IDs traversed by the route.
+    """
+    segment_ids = []
+    seen = set()
+    for u, v in zip(route[:-1], route[1:]):
+        data = get_edge_data(graph, u, v)
+        seg_id = get_segment_id(data, u, v)
+        if seg_id not in seen:
+            seen.add(seg_id)
+            segment_ids.append(seg_id)
+    return segment_ids
+
+
 def get_road_names(graph, route):
     """
     Return unique consecutive road names.
@@ -419,6 +449,7 @@ def build_route_details(graph, route):
         "geometry": get_route_geometry(graph, route),
         "distance_km": round(distance_m / 1000, 3),
         "road_names": get_road_names(graph, route),
+        "osm_segment_ids": get_route_segment_ids(graph, route),
         "instructions": generate_route_instructions(
             graph,
             route,

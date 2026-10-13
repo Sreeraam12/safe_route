@@ -555,6 +555,12 @@ async def mark_unsafe_sos_endpoint(
         )
     )
     await dispatch_sos_status_update(db, sos, list(contacts_res.scalars().all()), "RESOLVED (CORRIDOR MARKED UNSAFE)")
+
+    # Record direct personal segment memory penalty for this user
+    if sos.segment_id:
+        from backend.app.services.segment_memory_service import record_segment_unsafe_incident
+        await record_segment_unsafe_incident(current_user.id, sos.segment_id, db)
+
     await db.commit()
     await db.refresh(sos)
     return await _serialize_sos(db, sos)

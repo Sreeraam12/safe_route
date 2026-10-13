@@ -143,6 +143,44 @@ export default function RouteDetails({
         </div>
       </div>
 
+      {/* Personal Segment Memory Intelligence Badges */}
+      {Boolean(
+        (route.familiar_segments_count && route.familiar_segments_count > 0) ||
+        (route.avoided_segments_count && route.avoided_segments_count > 0) ||
+        (route.segment_memory_adjustment && Math.abs(route.segment_memory_adjustment) > 0.05)
+      ) && (
+        <div className="mb-4 rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs">
+          <div className="flex items-center justify-between font-bold text-slate-800 mb-1.5">
+            <span className="flex items-center gap-1.5">
+              <span>🧠</span> Road Memory Intelligence
+            </span>
+            {route.segment_memory_adjustment !== undefined && Math.abs(route.segment_memory_adjustment) > 0.05 && (
+              <span className={`px-2 py-0.5 rounded-full font-extrabold text-[10px] ${
+                route.segment_memory_adjustment < 0
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-amber-100 text-amber-800"
+              }`}>
+                {route.segment_memory_adjustment < 0
+                  ? `${route.segment_memory_adjustment.toFixed(1)} Familiarity Bonus`
+                  : `+${route.segment_memory_adjustment.toFixed(1)} Avoidance Risk`}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Boolean(route.familiar_segments_count && route.familiar_segments_count > 0) && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                <span>⭐</span> Familiar corridor ({route.familiar_segments_count} roads)
+              </span>
+            )}
+            {Boolean(route.avoided_segments_count && route.avoided_segments_count > 0) && (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 border border-amber-200">
+                <span>⚠️</span> Contains avoided corridor ({route.avoided_segments_count})
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Start Live Navigation Action Button */}
       {onStartNavigation && (
         <button

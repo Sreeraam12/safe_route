@@ -90,6 +90,7 @@ def calculate_personalized_route_risk(
     matched_segments_df: pd.DataFrame,
     twin_weights: Dict[str, float],
     time_context: Dict[str, Any],
+    segment_memory_eval: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, float]:
     """
     Apply Personal Twin adjustments to calculate Personalized Route Risk.
@@ -101,6 +102,7 @@ def calculate_personalized_route_risk(
                       + Isolation Aversion Adjustment
                       + Crowd Preference Adjustment
                       + Night Adjustment
+                      + Segment Memory Adjustment (road-level familiarity / avoidance)
     """
     total_length = matched_segments_df["edge_length"].sum() if "edge_length" in matched_segments_df.columns else 1.0
     if total_length <= 0:
@@ -139,7 +141,16 @@ def calculate_personalized_route_risk(
         night_scale = (twin_weights.get("night_weight", 0.5) - 0.5) * 2.0
         night_adj = float(night_scale * 5.0)
 
-    total_personal_adj = lighting_adj + isolation_adj + crime_adj + night_adj
+    # 5. Road-level segment memory adjustment
+    seg_adj = 0.0
+    familiar_count = 0
+    avoided_count = 0
+    if segment_memory_eval:
+        seg_adj = segment_memory_eval.get("segment_memory_adjustment", 0.0)
+        familiar_count = segment_memory_eval.get("familiar_segments_count", 0)
+        avoided_count = segment_memory_eval.get("avoided_segments_count", 0)
+
+    total_personal_adj = lighting_adj + isolation_adj + crime_adj + night_adj + seg_adj
     personalized_risk = float(np.clip(base_time_aware_risk + total_personal_adj, 0.0, 100.0))
     personalized_safety = float(100.0 - personalized_risk)
 
@@ -147,6 +158,9 @@ def calculate_personalized_route_risk(
         "personalized_risk": round(personalized_risk, 2),
         "personalized_safety_score": round(personalized_safety, 2),
         "personal_adjustment": round(total_personal_adj, 2),
+        "segment_memory_adjustment": round(seg_adj, 2),
+        "familiar_segments_count": familiar_count,
+        "avoided_segments_count": avoided_count,
         "lighting_adjustment": round(lighting_adj, 2),
         "isolation_adjustment": round(isolation_adj, 2),
         "crime_adjustment": round(crime_adj, 2),

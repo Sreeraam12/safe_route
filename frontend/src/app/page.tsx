@@ -14,7 +14,7 @@ import DashboardModal from "../components/dashboard/DashboardModal";
 import EmergencyModal from "../components/emergency/EmergencyModal";
 
 import type { RouteSearchResponse, RouteResult, UserProfile } from "../types/route";
-import { getMe, createTrip, startNavigation, fetchActiveAlertsForMe } from "../services/routeApi";
+import { getMe, createTrip, startNavigation, endNavigation, completeTrip, fetchActiveAlertsForMe } from "../services/routeApi";
 
 const SafeRouteMap = dynamic(
   () => import("../components/map/SafeRouteMap"),
@@ -144,6 +144,7 @@ export default function Home() {
         selected_route_id: route.route_index,
         selected_distance_km: route.distance_km,
         selected_safety_score: route.personalized_safety_score ?? route.safety_score,
+        selected_segment_ids: route.osm_segment_ids || [],
         interactions: routeData.routes.map((r) => ({
           route_id: r.route_index,
           route_rank: r.rank,
@@ -152,6 +153,7 @@ export default function Home() {
           route_safety_score: r.personalized_safety_score ?? r.safety_score,
           selected: r.route_index === route.route_index,
           rejected: r.route_index !== route.route_index,
+          osm_segment_ids: r.osm_segment_ids || [],
         })),
       };
 
@@ -189,6 +191,7 @@ export default function Home() {
     setActiveTripId(null);
     setUserLiveCoords(null);
     if (finishedId) {
+      completeTrip(finishedId).catch(() => {});
       setCompletedTripId(finishedId);
     }
   };

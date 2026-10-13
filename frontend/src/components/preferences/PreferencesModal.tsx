@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPreferences, updatePreferences, getTwinState } from "../../services/routeApi";
+import { getPreferences, updatePreferences, getTwinState, getSegmentMemory } from "../../services/routeApi";
 import type { PersonalPreferences, PersonalTwinState } from "../../types/route";
 
 interface PreferencesModalProps {
@@ -11,6 +11,7 @@ interface PreferencesModalProps {
 export default function PreferencesModal({ onClose }: PreferencesModalProps) {
   const [prefs, setPrefs] = useState<PersonalPreferences | null>(null);
   const [twin, setTwin] = useState<PersonalTwinState | null>(null);
+  const [segMemory, setSegMemory] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -18,9 +19,14 @@ export default function PreferencesModal({ onClose }: PreferencesModalProps) {
   useEffect(() => {
     async function loadData() {
       try {
-        const [p, t] = await Promise.all([getPreferences(), getTwinState()]);
+        const [p, t, sm] = await Promise.all([
+          getPreferences(),
+          getTwinState(),
+          getSegmentMemory(),
+        ]);
         setPrefs(p);
         setTwin(t);
+        setSegMemory(sm);
       } catch (err) {
         console.error("Error loading preferences:", err);
       } finally {
@@ -77,6 +83,30 @@ export default function PreferencesModal({ onClose }: PreferencesModalProps) {
                   <div>💡 Lighting: {(twin.lighting_weight * 100).toFixed(0)}%</div>
                   <div>🛡️ Crime: {(twin.crime_weight * 100).toFixed(0)}%</div>
                   <div>🌙 Night: {(twin.night_weight * 100).toFixed(0)}%</div>
+                </div>
+              </div>
+            )}
+
+            {/* Road Memory Summary */}
+            {segMemory && (
+              <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>🧠</span> Road Memory Intelligence
+                  </span>
+                  <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-700">
+                    {segMemory.total_remembered_corridors} Corridors
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-100">
+                    <span>⭐</span>
+                    <span><strong>{segMemory.familiar_corridors_count}</strong> Familiar / Trusted</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50/80 p-1.5 rounded-lg border border-amber-100">
+                    <span>⚠️</span>
+                    <span><strong>{segMemory.avoided_corridors_count}</strong> Avoided Streaks</span>
+                  </div>
                 </div>
               </div>
             )}

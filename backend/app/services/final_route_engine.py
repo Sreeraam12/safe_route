@@ -34,6 +34,8 @@ async def fetch_traffic_point(point):
 
 from backend.app.services.time_risk_engine import calculate_time_context
 from backend.app.services.personal_twin_engine import calculate_personalized_route_risk
+from backend.app.services.route_geometry import get_route_segment_ids
+from backend.app.services.segment_memory_service import evaluate_route_segment_memory
 
 async def calculate_final_route_scores(
     graph,
@@ -42,6 +44,7 @@ async def calculate_final_route_scores(
     risk_data,
     travel_datetime=None,
     twin_weights=None,
+    segment_memories=None,
     num_candidates=20,
     top_k=5,
 ):
@@ -57,6 +60,7 @@ async def calculate_final_route_scores(
         graph,
         source_node,
         destination_node,
+        segment_memories=segment_memories,
         num_candidates=num_candidates,
     )
 
@@ -154,14 +158,19 @@ async def calculate_final_route_scores(
 
         final_safety = 100.0 - final_risk
 
-        # Personal Twin calculation if user weights available
+        # Extract OSM segment IDs for this route
+        route_seg_ids = get_route_segment_ids(graph, route)
+        seg_memory_eval = evaluate_route_segment_memory(route_seg_ids, segment_memories or {})
+
+        # Personal Twin calculation if user weights available or segment memory present
         personal_metrics = None
-        if twin_weights:
+        if twin_weights or segment_memories:
             personal_metrics = calculate_personalized_route_risk(
                 base_time_aware_risk=final_risk,
                 matched_segments_df=matched_segments,
-                twin_weights=twin_weights,
+                twin_weights=twin_weights or {},
                 time_context=time_ctx,
+                segment_memory_eval=seg_memory_eval,
             )
             pers_risk = personal_metrics["personalized_risk"]
             pers_safety = personal_metrics["personalized_safety_score"]
@@ -231,6 +240,18 @@ async def calculate_final_route_scores(
 
             "personal_adjustment":
                 personal_metrics["personal_adjustment"] if personal_metrics else 0.0,
+
+            "segment_memory_adjustment":
+                personal_metrics["segment_memory_adjustment"] if personal_metrics else 0.0,
+
+            "familiar_segments_count":
+                personal_metrics["familiar_segments_count"] if personal_metrics else 0,
+
+            "avoided_segments_count":
+                personal_metrics["avoided_segments_count"] if personal_metrics else 0,
+
+            "osm_segment_ids":
+                route_seg_ids,
 
             "risk_coverage_pct":
                 route_data[

@@ -115,6 +115,7 @@ def generate_candidate_routes(
     graph,
     source_node,
     destination_node,
+    segment_memories=None,
     num_candidates=20,
     max_overlap=0.90,
     max_distance_factor=1.45,
@@ -206,10 +207,48 @@ def generate_candidate_routes(
     working_graph = simple_graph.copy()
 
     for u, v, data in working_graph.edges(data=True):
-        data["route_cost"] = max(
+        base_cost = max(
             float(data.get("length", 0.0)),
             1.0,
-    )
+        )
+        multiplier = 1.0
+
+        if segment_memories:
+            osmid = data.get("osmid")
+            seg_id = None
+            if osmid:
+                if isinstance(osmid, list):
+                    seg_id = str(osmid[0])
+                elif isinstance(osmid, str) and osmid.startswith("["):
+                    clean = osmid.strip("[]'\" ").split(",")[0].strip(" '\"")
+                    seg_id = clean if clean else str(osmid)
+                else:
+                    seg_id = str(osmid)
+            if not seg_id:
+                seg_id = f"{u}_{v}"
+
+            mem = segment_memories.get(seg_id)
+            if mem:
+                avoidance = mem.get("avoidance_score", 0.0)
+                trust = mem.get("trust_score", 0.5)
+                visits = mem.get("visit_count", 0)
+                rejections = mem.get("rejection_count", 0)
+
+                # Pre-search Avoidance Penalty:
+                # Steer Dijkstra away from streets user actively avoids or reported unsafe
+                if avoidance >= 0.70:
+                    multiplier *= 15.0  # Critical avoidance: 15x cost
+                elif avoidance >= 0.35:
+                    multiplier *= 4.0   # Moderate avoidance: 4x cost
+                elif rejections >= 3:
+                    multiplier *= 2.0   # Repeatedly rejected: 2x cost
+
+                # Pre-search Familiarity Discount:
+                # Favor streets user frequently visits and feels safe on
+                if trust >= 0.70 and visits >= 2:
+                    multiplier *= 0.80  # 20% preference bonus
+
+        data["route_cost"] = base_cost * multiplier
 
     candidate_routes = []
 

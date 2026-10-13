@@ -23,6 +23,9 @@ from backend.app.services.final_route_engine import (
 from backend.app.services.route_geometry import (
     build_route_details,
 )
+from backend.app.services.segment_memory_service import (
+    get_user_segment_memories_map,
+)
 
 
 router = APIRouter(
@@ -120,6 +123,11 @@ async def search_route(
         db,
     )
 
+    segment_memories = await get_user_segment_memories_map(
+        current_user.id if current_user else None,
+        db,
+    )
+
     try:
         ranked_routes = await calculate_final_route_scores(
             graph=route_data["graph"],
@@ -128,6 +136,7 @@ async def search_route(
             risk_data=RISK_DATA,
             travel_datetime=travel_datetime,
             twin_weights=twin_weights,
+            segment_memories=segment_memories,
             num_candidates=20,
             top_k=5,
         )
@@ -215,6 +224,18 @@ async def search_route(
 
             "road_names":
                 route_details["road_names"],
+
+            "osm_segment_ids":
+                route.get("osm_segment_ids", route_details.get("osm_segment_ids", [])),
+
+            "familiar_segments_count":
+                route.get("familiar_segments_count", 0),
+
+            "avoided_segments_count":
+                route.get("avoided_segments_count", 0),
+
+            "segment_memory_adjustment":
+                route.get("segment_memory_adjustment", 0.0),
 
             "instructions":
                 route_details["instructions"],
