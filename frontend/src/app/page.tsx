@@ -14,7 +14,7 @@ import DashboardModal from "../components/dashboard/DashboardModal";
 import EmergencyModal from "../components/emergency/EmergencyModal";
 
 import type { RouteSearchResponse, RouteResult, UserProfile } from "../types/route";
-import { getMe, createTrip, startNavigation } from "../services/routeApi";
+import { getMe, createTrip, startNavigation, fetchActiveAlertsForMe } from "../services/routeApi";
 
 const SafeRouteMap = dynamic(
   () => import("../components/map/SafeRouteMap"),
@@ -53,6 +53,29 @@ export default function Home() {
 
   // Post-trip feedback
   const [completedTripId, setCompletedTripId] = useState<string | null>(null);
+  const [incomingAlerts, setIncomingAlerts] = useState<any[]>([]);
+
+  // Real-time polling for incoming SOS alerts where current user is a trusted contact (e.g. Test-user-2)
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+
+    async function pollAlerts() {
+      try {
+        const res = await fetchActiveAlertsForMe();
+        if (isMounted && res?.alerts) {
+          setIncomingAlerts(res.alerts);
+        }
+      } catch {}
+    }
+
+    pollAlerts();
+    const interval = setInterval(pollAlerts, 7000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -278,6 +301,40 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* Real-Time Incoming Emergency SOS Banner for Registered Contacts (e.g. Test-user-2) */}
+      {incomingAlerts.length > 0 && (
+        <div className="absolute top-20 left-4 right-4 z-[1100] max-w-xl mx-auto bg-red-600 text-white p-3 rounded-2xl shadow-2xl border-2 border-white animate-pulse flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+            <span className="text-xl shrink-0">{"\u{1F6A8}"}</span>
+            <div className="min-w-0">
+              <div className="font-extrabold text-xs uppercase tracking-wide truncate">
+                EMERGENCY ALERT: {incomingAlerts[0].sender_name.toUpperCase()} TRIGGERED SOS!
+              </div>
+              <div className="text-[11px] text-red-100 font-medium truncate">
+                Near {incomingAlerts[0].road_name} {"\u{2022}"} Police: {incomingAlerts[0].nearest_police}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={incomingAlerts[0].tracking_url}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-white text-red-700 font-extrabold text-xs px-3 py-1.5 rounded-xl shadow hover:bg-red-50"
+            >
+              Track Live {"\u{1F4CD}"}
+            </a>
+            <button
+              onClick={() => setIncomingAlerts([])}
+              className="text-red-200 hover:text-white text-xs font-bold px-1"
+              title="Dismiss alert banner"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Map with custom Source, Destination & Live GPS Markers */}
       <SafeRouteMap

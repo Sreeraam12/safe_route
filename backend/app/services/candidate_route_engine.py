@@ -143,10 +143,43 @@ def generate_candidate_routes(
         )
 
     except nx.NetworkXNoPath:
-        raise ValueError(
-            "No driving route exists between "
-            "the selected locations."
-        )
+        # Fallback 1: Try adjacent navigable nodes in case source or destination is a one-way dead end
+        src_candidates = [source_node]
+        dst_candidates = [destination_node]
+        if hasattr(simple_graph, "successors"):
+            src_candidates.extend(list(simple_graph.successors(source_node))[:10])
+        if hasattr(simple_graph, "predecessors"):
+            dst_candidates.extend(list(simple_graph.predecessors(destination_node))[:10])
+
+        route_found = None
+        for s in src_candidates:
+            for d in dst_candidates:
+                try:
+                    route_found = nx.shortest_path(simple_graph, s, d, weight="length")
+                    source_node = s
+                    destination_node = d
+                    break
+                except nx.NetworkXNoPath:
+                    continue
+            if route_found:
+                break
+
+        if route_found:
+            shortest_route = route_found
+        else:
+            # Fallback 2: Try undirected graph view
+            try:
+                undirected_simple = simple_graph.to_undirected(as_view=True)
+                shortest_route = nx.shortest_path(
+                    undirected_simple,
+                    source_node,
+                    destination_node,
+                    weight="length",
+                )
+            except Exception:
+                raise ValueError(
+                    "No driving route exists between the selected locations."
+                )
 
     shortest_distance = route_distance(
         simple_graph,

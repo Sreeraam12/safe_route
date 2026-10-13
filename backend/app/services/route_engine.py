@@ -41,7 +41,7 @@ def get_shortest_route(
     destination_latitude: float,
     destination_longitude: float,
 ):
-    """Return the shortest driving route between two coordinates."""
+    """Return the shortest driving route between two coordinates with resilient node fallbacks."""
 
     source_node = get_nearest_node(
         source_latitude,
@@ -53,12 +53,44 @@ def get_shortest_route(
         destination_longitude,
     )
 
-    route = nx.shortest_path(
-        GRAPH,
-        source_node,
-        destination_node,
-        weight="length",
-    )
+    try:
+        route = nx.shortest_path(
+            GRAPH,
+            source_node,
+            destination_node,
+            weight="length",
+        )
+    except (nx.NetworkXNoPath, nx.NodeNotFound):
+        # Resilient fallback: Try adjacent candidate nodes on navigable corridors
+        src_candidates = [source_node]
+        dst_candidates = [destination_node]
+
+        if hasattr(GRAPH, "successors"):
+            src_candidates.extend(list(GRAPH.successors(source_node))[:5])
+        if hasattr(GRAPH, "predecessors"):
+            dst_candidates.extend(list(GRAPH.predecessors(destination_node))[:5])
+
+        route = None
+        for s in src_candidates:
+            for d in dst_candidates:
+                try:
+                    route = nx.shortest_path(GRAPH, s, d, weight="length")
+                    source_node = s
+                    destination_node = d
+                    break
+                except (nx.NetworkXNoPath, nx.NodeNotFound):
+                    continue
+            if route:
+                break
+
+        if not route:
+            try:
+                undirected_G = GRAPH.to_undirected(as_view=True)
+                route = nx.shortest_path(undirected_G, source_node, destination_node, weight="length")
+            except Exception:
+                raise nx.NetworkXNoPath(
+                    f"No navigable road path found between ({source_latitude:.4f}, {source_longitude:.4f}) and ({destination_latitude:.4f}, {destination_longitude:.4f})."
+                )
 
     return {
         "source_node": source_node,

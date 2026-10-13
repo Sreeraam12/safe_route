@@ -96,14 +96,20 @@ async def search_route(
         travel_time,
     )
 
-    route_data = get_shortest_route(
-        source["latitude"],
-        source["longitude"],
-        destination["latitude"],
-        destination["longitude"],
-    )
-    source_node = route_data["source_node"]
-    destination_node = route_data["destination_node"]
+    try:
+        route_data = get_shortest_route(
+            source["latitude"],
+            source["longitude"],
+            destination["latitude"],
+            destination["longitude"],
+        )
+        source_node = route_data["source_node"]
+        destination_node = route_data["destination_node"]
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No navigable road path found between '{request.source}' and '{request.destination}'. Please choose nearby arterial road points.",
+        )
 
     # -----------------------------------------------------
     # 4. Generate + score Top 5 routes
@@ -114,16 +120,22 @@ async def search_route(
         db,
     )
 
-    ranked_routes = await calculate_final_route_scores(
-        graph=route_data["graph"],
-        source_node=source_node,
-        destination_node=destination_node,
-        risk_data=RISK_DATA,
-        travel_datetime=travel_datetime,
-        twin_weights=twin_weights,
-        num_candidates=20,
-        top_k=5,
-    )
+    try:
+        ranked_routes = await calculate_final_route_scores(
+            graph=route_data["graph"],
+            source_node=source_node,
+            destination_node=destination_node,
+            risk_data=RISK_DATA,
+            travel_datetime=travel_datetime,
+            twin_weights=twin_weights,
+            num_candidates=20,
+            top_k=5,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No driving route exists between '{request.source}' and '{request.destination}'. Please choose nearby arterial road locations.",
+        )
 
     # -----------------------------------------------------
     # 5. Add geometry + instructions

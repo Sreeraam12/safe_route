@@ -272,3 +272,37 @@ export async function endNavigation(tripId: string) {
   });
   return response.json();
 }
+export async function manualReroute(payload: {
+  trip_id: string;
+  current_lat: number;
+  current_lon: number;
+  destination_lat: number;
+  dest_lon: number;
+}) {
+  const response = await fetch(`${getApiUrl()}/api/navigation/reroute`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error("Reroute failed");
+  return response.json();
+}
+
+export async function fetchActiveAlertsForMe() {
+  const token = typeof window !== "undefined" ? (localStorage.getItem("saferoute_token") || localStorage.getItem("token")) : null;
+  if (!token) return { alerts: [] };
+  try {
+    const response = await fetch(`${getApiUrl()}/api/sos/active-alerts-for-me`, {
+      headers: {
+        ...getAuthHeader(),
+      },
+    });
+    if (!response.ok) return { alerts: [] };
+    return response.json();
+  } catch {
+    return { alerts: [] };
+  }
+}

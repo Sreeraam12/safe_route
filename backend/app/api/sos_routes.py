@@ -337,6 +337,49 @@ async def track_sos_by_token_endpoint(
     return await _serialize_sos(db, sos)
 
 
+@sos_router.get("/active-alerts-for-me")
+async def get_active_alerts_for_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns any ACTIVE SOS events triggered by travelers who have listed `current_user`
+    as an active emergency contact (matched via contact_user_id or phone number).
+    """
+    stmt = (
+        select(SOSEvent, User)
+        .join(TrustedContact, TrustedContact.owner_user_id == SOSEvent.user_id)
+        .join(User, User.id == SOSEvent.user_id)
+        .where(
+            SOSEvent.status == "ACTIVE",
+            TrustedContact.is_active == True,
+            (TrustedContact.contact_user_id == current_user.id)
+        )
+    )
+    res = await db.execute(stmt)
+    rows = res.all()
+
+    alerts = []
+    seen = set()
+    for sos, sender in rows:
+        if sos.id in seen:
+            continue
+        seen.add(sos.id)
+        alerts.append({
+            "sos_id": sos.id,
+            "sender_name": sender.name or sender.email.split("@")[0],
+            "sender_email": sender.email,
+            "road_name": sos.road_name or "Chennai Monitored Corridor",
+            "lat": sos.latest_lat,
+            "lon": sos.latest_lon,
+            "share_token": sos.share_token,
+            "tracking_url": f"/sos/track/{sos.share_token}",
+            "nearest_police": sos.nearest_police_station_name or "Chennai Police Patrol",
+            "created_at": sos.created_at.isoformat() if sos.created_at else None,
+        })
+    return {"alerts": alerts}
+
+
 @sos_router.get("/{sos_id}")
 async def get_sos_detail_endpoint(
     sos_id: str,
@@ -452,6 +495,66 @@ async def resolve_sos_endpoint(
         )
     )
     await dispatch_sos_status_update(db, sos, list(contacts_res.scalars().all()), "RESOLVED (USER SAFE)")
+    await db.commit()
+    await db.refresh(sos)
+    return await _serialize_sos(db, sos)
+@sos_router.post("/{sos_id}/mark-unsafe")
+async def mark_unsafe_sos_endpoint(
+    sos_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Marks an active SOS as resolved with resolution_type='CORRIDOR_UNSAFE'.
+    Promotes the corridor safety event to high confidence (0.90) for 48h so future
+    routing engines and other travelers heavily avoid this dangerous stretch.
+    """
+    res = await db.execute(
+        select(SOSEvent).where(
+            SOSEvent.id == sos_id,
+            SOSEvent.user_id == current_user.id,
+        )
+    )
+    sos = res.scalar_one_or_none()
+    if not sos:
+        raise HTTPException(status_code=404, detail="SOS not found")
+
+    sos.status = "RESOLVED"
+    sos.resolution_type = "CORRIDOR_UNSAFE"
+    sos.resolved_at = datetime.now(timezone.utc)
+
+    # Escalate or insert SafetyEvent with confidence=0.90
+    safety_res = await db.execute(
+        select(SafetyEvent).where(SafetyEvent.sos_id == sos.id)
+    )
+    safety_evt = safety_res.scalar_one_or_none()
+    if safety_evt:
+        safety_evt.event_type = "CORRIDOR_UNSAFE_CONFIRMED"
+        safety_evt.verification_status = "USER_REPORTED_HAZARD"
+        safety_evt.confidence = 0.90
+        safety_evt.expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
+    else:
+        db.add(
+            SafetyEvent(
+                sos_id=sos.id,
+                segment_id=sos.segment_id,
+                road_name=sos.road_name,
+                lat=sos.latest_lat,
+                lon=sos.latest_lon,
+                event_type="CORRIDOR_UNSAFE_CONFIRMED",
+                verification_status="USER_REPORTED_HAZARD",
+                confidence=0.90,
+                expires_at=datetime.now(timezone.utc) + timedelta(hours=48),
+            )
+        )
+
+    contacts_res = await db.execute(
+        select(TrustedContact).where(
+            TrustedContact.owner_user_id == current_user.id,
+            TrustedContact.is_active == True,
+        )
+    )
+    await dispatch_sos_status_update(db, sos, list(contacts_res.scalars().all()), "RESOLVED (CORRIDOR MARKED UNSAFE)")
     await db.commit()
     await db.refresh(sos)
     return await _serialize_sos(db, sos)
