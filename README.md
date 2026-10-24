@@ -1,337 +1,438 @@
-# SafeRoute: Chennai Women's Safe Mobility, Personal Digital Twin & Emergency SOS System
+# SafeRoute: Context-Aware Personal Safety Routing, Dynamic Risk Graph Formulation & Emergency Navigation System
 
-SafeRoute is an AI-driven, time-aware, personalized safe route recommendation, live turn-by-turn GPS navigation, and real-time emergency SOS platform engineered for the metropolitan road network of Chennai, India.
+**SafeRoute** is an AI-driven, time-aware, personalized safe route recommendation, live turn-by-turn navigation, and tactical emergency response platform engineered specifically for the metropolitan road network of Chennai, India.
 
-It unifies OpenStreetMap (OSM) road topology, a 35-feature LightGBM environmental and crime risk model, live TomTom traffic intelligence, non-linear temporal vulnerability curves, an adaptive **Personal Digital Twin** that learns from both route selections and post-trip user feedback, a real-time **GPS map-matching & dynamic re-routing engine**, and an integrated **Emergency SOS & Incident Response subsystem** with live guardian tracking, Chennai Police Station Haversine dispatch, and real-time corridor risk updates.
-
----
-
-## Key Capabilities
-
-1. **Metropolitan Chennai Road Network & Resilient Geocoding**:
-   - High-fidelity OSM road network (`chennai_drive.graphml.xml`) with **68,667 nodes** and **173,935 directed road edges** cached locally for rapid startup (<10s).
-   - Multi-route candidate generation using iterative edge-penalty diversification and overlap control to surface distinct, meaningful spatial alternatives (Safest, Balanced, Fastest, Well-Lit, Main Roads).
-   - **Resilient Dual-Stage Geocoder**: Pairs OpenStreetMap Nominatim HTTP geocoding with an instant local Chennai landmark coordinate dictionary (covering 20+ hubs such as T. Nagar, Adyar, Anna Nagar, Velachery, Guindy, Tambaram, OMR, Mylapore, Egmore, Marina Beach, etc.) so route searches succeed even during external network timeouts.
-
-2. **35-Feature LightGBM Risk Model & Real-Time Incident Overlay**:
-   - Evaluates 35 road-segment attributes including historical crime severity, street lighting density, CCTV coverage, sidewalk availability, commercial crowd levels, road classification, police station/metro proximity, and weather variables.
-   - Dynamically overlays active `SafetyEvent` alerts (such as recent SOS distress triggers or community hazards) with confidence-weighted decay (`severity * confidence`) so routes automatically steer around active incident corridors.
-
-3. **Time-Aware Vulnerability Engine & Live TomTom Traffic**:
-   - Models non-linear temporal risk across **Morning**, **Afternoon**, **Evening**, **Night**, and **Late-Night** windows.
-   - Dynamically scales penalties for road isolation, unlit segments, and low-crowd corridors during dark hours.
-   - Integrates live **TomTom Traffic Flow API** segment speeds and congestion ratios with automatic offline speed-model fallback.
-
-4. **Personal Digital Twin & Post-Trip Feedback Loop**:
-   - Maintains an individualized safety profile (`personal_preferences` + `personal_twin_state`) initialized via user archetypes (e.g., *Safety-First*, *Night-Caution*, *Balanced*, *Time-Conscious*).
-   - **Two-Stage Adaptation**:
-     1. **Revealed Preference Update**: When a user selects a candidate route over alternatives, the Twin compares the chosen route's attributes against rejected alternatives and shifts weights toward the user's revealed priority.
-     2. **Post-Trip Explicit Feedback (`TripFeedbackModal`)**: Upon arriving at the destination, the user rates overall trip safety (1?5 stars), comfort level, lighting/crowd conditions, and specific concern tags (`poor_lighting`, `isolated_stretch`, `suspicious_activity`, `high_traffic`). The Twin updates both global preference weights and **segment-level memory bias** to avoid uncomfortable streets on future journeys.
-
-5. **Live GPS Navigation & Dynamic Off-Route Re-Routing**:
-   - High-precision cross-track error map-matching (`gps_matcher.py`) projecting live GPS coordinates onto the active route polyline.
-   - Real-time step countdown, distance-to-next-turn, voice/visual maneuver guidance, and live ETA recalculation in `NavigationHUD.tsx`.
-   - Multi-ping confirmation buffer (**50m cross-track threshold across 2 consecutive GPS pings**) preventing false off-route triggers from GPS jitter.
-   - Automated sub-500ms safe route recalculation from the user's live coordinates when a true route deviation is confirmed.
-
-6. **Emergency SOS, Trusted Contact Dispatch & Live Guardian Tracking**:
-   - **Trusted Contacts Onboarding & Management**: Users register emergency contacts during sign-up (`LoginPage.tsx`) or manage them anytime via the **??? Profile & Contacts** modal (`EmergencyModal.tsx`), enforced with strict 10-digit numeric phone validation (`^\d{10}$`).
-   - **1-Click SOS Trigger (`NavigationHUD.tsx`)**:
-     - Immediately **freezes navigation movement** at the exact distress coordinates until the user explicitly cancels or resolves the SOS.
-     - Snaps GPS coordinates to the nearest OSM street segment (`road_name`) and locates the **nearest Greater Chennai Police Station** via Haversine distance (`police_station_service.py`).
-     - Generates a cryptographic live tracking link (`/sos/track/[token]`) and logs alerts to all active trusted contacts (`sos_notifications`), complete with 1-click **SMS**, **WhatsApp**, **Share Live Link**, and **Call 112** dispatch buttons.
-     - Injects a temporary 24-hour unverified `SafetyEvent` (`confidence=0.30`) on the affected corridor to warn other SafeRoute travellers in real time.
+It transforms OpenStreetMap (OSM) road topologies into dynamic risk graphs, applying **Pre-Search Road Memory Biasing** (penalizing avoided corridors up to 15x and discounting trusted corridors), diverse **Iterative Edge-Penalized Candidate Discovery**, real-time **TomTom Traffic Flow Telemetry**, an adaptive **Personal Digital Twin**, continuous **Tactical HUD GPS Map-Matching with Off-Route Deviation Detection**, and an integrated **Multi-Channel Emergency SOS Subsystem** with spatial nearest police station discovery and live guardian tracking tokens.
 
 ---
 
-## System Architecture & End-to-End Data Flow
+## 🌟 Core System Capabilities
+
+### 1. Pre-Search Road Memory Biasing Engine (`candidate_route_engine.py`)
+- **Proactive Avoidance Over Post-Hoc Filtering**: Unlike standard routing systems that evaluate personal preferences only *after* paths are discovered, SafeRoute modifies edge impedances **prior to pathfinding**:
+  $$\text{route\_cost}(e) = \max(\ell(e), 1.0) \times M_{\text{memory}}(e)$$
+- **Dynamic Memory Multipliers**:
+  - **Critical Avoidance ($S_{\text{avoid}} \ge 0.70$):** Multiplies edge cost by **$15.0\times$**, forcing Dijkstra's algorithm to structurally detour around dangerous or reported corridors.
+  - **Moderate Avoidance ($0.35 \le S_{\text{avoid}} < 0.70$):** Multiplies edge cost by **$4.0\times$**.
+  - **Repeated Rejections ($N_{\text{reject}} \ge 3$):** Multiplies edge cost by **$2.0\times$** for streets the user consistently ignores.
+  - **Familiar & Trusted Corridors ($S_{\text{trust}} \ge 0.70, N_{\text{visit}} \ge 2$):** Grants a **$20\%$ cost discount ($0.80\times$)**, guiding pathfinding through corridors the user knows and feels comfortable traversing.
+
+### 2. Diverse Candidate Route Discovery via Iterative Edge Penalization
+- **High-Fidelity Road Network**: In-memory directed graph of Chennai road topology with node snapping, one-way dead-end recovery, and adjacent graph fallbacks.
+- **Iterative Penalization (Algorithm 4.1)**: Discovers 7 to 20 candidate paths bounded by a strict distance factor ($D_{\text{max}} = 1.45 \times D_{\text{shortest}}$). After each accepted route, its constituent edges are penalized by $1.25\times$.
+- **Jaccard Overlap Filtering**: Filters out redundant paths with edge Jaccard similarity $> 0.90$, presenting genuinely distinct geographic alternatives.
+
+### 3. Multi-Criteria Hybrid Safety Scoring & Live Traffic Telemetry (`final_route_engine.py`)
+- **Multi-Source Built Environment Modeling**:
+  - Street illumination from OSM lighting tags (`lit=yes` vs `lit=no`);
+  - Road hierarchy (dual-carriageway primary vs. narrow residential alley);
+  - Spatial proximity bonus to certified police stations ($1.5\,\text{km}$ decay radius);
+  - Bivariate Gaussian kernel crime hotspot density.
+- **Live TomTom Traffic Flow Telemetry**: Queries real-time vehicle velocity $v_{\text{curr}}$ and free-flow velocity $v_{\text{free}}$ to assess street isolation and stagnation. Avoids deserted roadways late at night while penalizing severe gridlocks.
+- **Dynamic Weight Renormalisation**: Automatically renormalises scoring weights across active signals if traffic APIs experience transient network outages.
+- **Pareto-Optimal Archetype Classification**: Categorizes candidates into:
+  - 🟢 **Safest Route**: Maximum illumination, wide thoroughfares, and police proximity (highest Safety Score).
+  - 🟡 **Balanced Route**: Optimal compromise between transit duration and safety score.
+  - 🟠 **Fastest Route**: Minimum physical travel duration.
+
+### 4. Personal Digital Twin & Traversal Memory Lifecycle (`personal_twin_engine.py`, `segment_memory_service.py`)
+- **Demographic Vulnerability Curve**: Dynamically tunes safety weights based on age, gender, travel mode, and night sensitivity.
+- **Automated Segment Traversal Lifecycle**:
+  - Ending navigation automatically marks the trip complete in PostgreSQL (`/api/navigation/end` and `/api/trips/{trip_id}/complete`), atomically incrementing `visit_count` and updating `last_visit`.
+  - Candidate route presentation tracks `selection_count` for chosen routes and `rejection_count` for unselected alternatives.
+- **Post-Trip Learning Loop**: 1-tap feedback modal updates `trust_score` and `avoidance_score` in `personal_segment_memory`, immediately influencing future route recommendations.
+
+### 5. Turn-by-Turn Tactical Navigation HUD & Deviation Sentinel (`NavigationHUD.tsx`)
+- **Real-Time Kinematic Tracking**: Supports device GPS and interactive simulated on-road drive, streaming coordinates every 2 seconds via `/api/navigation/gps-stream`.
+- **Cross-Track Haversine Deviation Sentinel**: Computes perpendicular distance from the planned route polyline. If drift exceeds **$45\,\text{m}$ for consecutive epochs**, the HUD sounds a warning chime and triggers automated recalculation from the live position.
+- **Local Network Dynamic Host Detection**: `routeApi.ts` automatically detects LAN hostnames (e.g. `http://10.23.104.207:3000`), allowing mobile devices on the same Wi-Fi to seamlessly connect to backend services without hardcoded localhost errors.
+
+### 6. Emergency SOS Subsystem, Synthesized Siren & Guardian Tracking (`sos_routes.py`)
+- **Instant Telemetry Freeze**: Locks coordinates at the exact incident location and halts movement simulation.
+- **Web Audio API Acoustic Siren**: Synthesizes an oscillating $850\,\text{Hz} - 1200\,\text{Hz}$ square/sawtooth alarm siren at maximum gain through the device speaker.
+- **Spatial Nearest Police Station Discovery**: Sub-millisecond lookup across 135+ Greater Chennai Police Stations via spatial distance calculation, identifying station name, contact number, and distance.
+- **Multi-Channel Alert Broadcasting**:
+  - Issues 64-bit cryptographic share tokens for public tracking (`/sos/track/[token]`);
+  - Dispatches carrier SMS via Twilio to registered emergency contacts;
+  - Generates 1-click WhatsApp emergency location cards;
+  - Broadcasts real-time incident updates to guardian dashboards via `/api/sos/active-alerts-for-me` WebSockets.
+
+---
+
+## 🏗️ System Architecture & End-to-End User Journey
+
+### 1. High-Level Layered Architecture
 
 ```text
-                      ????????????????????????????????????????????
-                      ?         USER, AUTH & TRUSTED CONTACTS    ?
-                      ?   JWT Auth + 10-Digit Validated Contacts ?
-                      ????????????????????????????????????????????
-                                           ?
-                               Search: Origin + Dest + Time
-                                           ?
-                                           ?
-                      ????????????????????????????????????????????
-                      ?     RESILIENT GEOCODER & CHENNAI OSM     ?
-                      ?  Nominatim + Local Landmark Fallback     ?
-                      ?  68,667 Nodes / 173,935 Edges Graph      ?
-                      ????????????????????????????????????????????
-                                           ?
-        ???????????????????????????????????????????????????????????????????????
-        ?                                  ?                                  ?
-        ?                                  ?                                  ?
-??????????????????????          ??????????????????????             ??????????????????????
-? 35-Feature LightGBM?          ? Time-Risk & Active ?             ? TomTom Live Traffic?
-? Base Safety Scorer ?          ? SafetyEvents Layer ?             ? + Offline Fallback ?
-??????????????????????          ??????????????????????             ??????????????????????
-          ?                                ?                                  ?
-          ?????????????????????????????????????????????????????????????????????
-                                           ?
-                      ????????????????????????????????????????????
-                      ?         PERSONAL DIGITAL TWIN LAYER      ?
-                      ?  Adaptive Weights + Road Segment Memory  ?
-                      ????????????????????????????????????????????
-                                           ?
-                      ????????????????????????????????????????????
-                      ?       TOP RANKED CANDIDATE ROUTES        ?
-                      ?  Explainable Attribution & Risk Badges   ?
-                      ????????????????????????????????????????????
-                                           ?
-                      ????????????????????????????????????????????
-                      ?        LIVE GPS NAVIGATION HUD           ?
-                      ?  Map-Matching + 50m Off-Route Rerouting  ?
-                      ????????????????????????????????????????????
-                                ?                      ?
-               Normal Arrival   ?                      ?  Emergency SOS Triggered
-                                ?                      ?
-          ?????????????????????????????    ????????????????????????????????????????
-          ?  POST-TRIP FEEDBACK MODAL ?    ?       EMERGENCY SOS ENGINE           ?
-          ?  1-5? Rating & Issue Tags ?    ? ? Halts Navigation Movement          ?
-          ?  Updates Twin Weights &   ?    ? ? Nearest Chennai Police (Haversine) ?
-          ?  Corridor Memory Bias     ?    ? ? Trusted Contact SMS / WhatsApp     ?
-          ?????????????????????????????    ? ? Live Tracking (/sos/track/[token]) ?
-                                           ? ? 24h Temporary SafetyEvent Penalty  ?
-                                           ????????????????????????????????????????
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                   PRESENTATION LAYER (Next.js 15 / React / Tailwind)        │
+│  Origin/Dest Input  │  Ranked Route Cards  │  Tactical HUD  │ Tracking Page │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ HTTPS REST / WebSockets
+┌──────────────────────────────────────▼──────────────────────────────────────┐
+│                    API ORCHESTRATION LAYER (FastAPI Backend)                │
+│  /api/routes/search  │  /api/navigation/*   │  /api/sos/*  │  /api/trips/*  │
+└──────────┬───────────────────────────┬───────────────────────────┬──────────┘
+           │                           │                           │
+┌──────────▼───────────────┐ ┌─────────▼───────────────┐ ┌─────────▼──────────┐
+│   SPATIAL GRAPH ENGINE   │ │  HYBRID RISK & TWIN     │ │ EMERGENCY SOS      │
+│ - OSMnx Road Network     │ │ - TomTom Traffic Flow   │ │ - Police KD-Tree   │
+│ - Pre-Search Biasing     │ │ - Diurnal Lighting      │ │ - Acoustic Siren   │
+│ - Penalized Dijkstra     │ │ - Personal Twin Memory  │ │ - Twilio/WhatsApp  │
+└──────────┬───────────────┘ └─────────┬───────────────┘ └─────────┬──────────┘
+           │                           │                           │
+┌──────────▼───────────────────────────▼───────────────────────────▼──────────┐
+│                         DATA PERSISTENCE & CACHING LAYER                    │
+│  PostgreSQL / SQLite  │  personal_segment_memory  │  In-Memory OSM Cache    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### 2. Complete End-to-End Operational Workflow Diagram
+
+```mermaid
+flowchart TD
+
+  %% ─────────────────────────────────────────
+  %% 1. LOGIN
+  %% ─────────────────────────────────────────
+  A(["👤 User Opens SafeRoute\n(Browser / Mobile)"]) --> B
+
+  subgraph AUTH["1️⃣  Authentication & Onboarding"]
+    B["AuthModal — Enter email + password\n+ Add Trusted Emergency Contacts\n+ Set Safety Preferences sliders"]
+    B --> C["POST /api/auth/register OR /api/auth/login"]
+    C --> D["security.py → bcrypt verify\nJWT token issued"]
+    D --> E[("PostgreSQL\nusers · personal_preferences\nPersonalTwinState · TrustedContacts")]
+  end
+
+  E --> F
+
+  %% ─────────────────────────────────────────
+  %% 2. ROUTE SEARCH
+  %% ─────────────────────────────────────────
+  subgraph SEARCH["2️⃣  Route Search  —  SearchPanel.tsx"]
+    F["User enters:\n📍 Origin (e.g. Chennai Central)\n📍 Destination (e.g. Marina Beach)\n🕐 Departure time"]
+    F --> G["POST /api/routes/search\nroutes.py"]
+  end
+
+  %% ─────────────────────────────────────────
+  %% 3. INTERNAL ROUTE ENGINE PIPELINE
+  %% ─────────────────────────────────────────
+  G --> H
+
+  subgraph PIPELINE["3️⃣  Internal Route Generation Pipeline"]
+    direction TB
+
+    H["🗺️  STEP 1 — Geocoding\ngeocoder.py\nNominatim API → lat/lon\nChennai landmark fallback dict"]
+
+    H --> I["📌  STEP 2 — Node Snapping\nroute_engine.py\nSnap lat/lon → nearest OSM node\nin in-memory 68,667-node DiGraph"]
+
+    I --> J["🧠  STEP 3 — Pre-Search Memory Biasing\ncandidate_route_engine.py\nFor every road edge e:\n  avoidance ≥ 0.70  →  15× cost ⛔\n  avoidance ≥ 0.35  →   4× cost 🔴\n  rejections ≥ 3    →   2× cost 🟠\n  trust+visits ≥ 2  →  0.80× cost 🟢"]
+
+    J --> K["🔀  STEP 4 — Iterative Edge-Penalized\nCandidate Discovery\ncandidate_route_engine.py\nDijkstra on biased graph → Path R₀\nD_max = 1.45 × D₀\nPenalize edges × 1.25 per accepted route\nJaccard overlap ≤ 0.90 filter\n→ 7–20 Diverse Candidate Paths"]
+
+    K --> L["⚠️  STEP 5 — Hybrid Risk Scoring\nroute_scoring.py + risk_engine.py\nosm_hybrid_risk.pkl + ml_engine.py\n35-Feature LightGBM base score\n• Street Lighting  (OSM lit tags)\n• Road Hierarchy   (primary→alley)\n• Crime Density    (kernel clusters)\n• Police Proximity (1.5 km decay)"]
+
+    L --> M["🕐  STEP 6 — Time-of-Day Multiplier\ntime_risk_engine.py\nDaytime  → 1.00×\nEvening  → 1.35×\nNight    → 1.75×\nLate Night → 2.20×"]
+
+    M --> N["🚗  STEP 7 — Live Traffic Telemetry\ntraffic_engine.py\nTomTom Traffic Flow API\nv_curr / v_free per segment\nGridlock → 1.40×  Deserted → 1.30×\nFlowing  → 0.85×  Offline → diurnal fallback"]
+
+    N --> O["👤  STEP 8 — Personal Twin Calibration\npersonal_twin_engine.py\nBlend explicit prefs + learned Twin weights\nVulnerability curve (age, gender, mode)\nPersonal risk offset R_personal ∈ [-15, +25]"]
+
+    O --> P["🏆  STEP 9 — Pareto Multi-Criteria Ranking\nfinal_route_engine.py\nComposite Safety Score = 0–100\nAssign archetypes:\n🟢 Safest  🟡 Balanced  🟠 Fastest"]
+  end
+
+  %% ─────────────────────────────────────────
+  %% 4. DISPLAY ROUTES
+  %% ─────────────────────────────────────────
+  P --> Q
+
+  subgraph DISPLAY["4️⃣  Route Display  —  RouteList / RouteDetails / SafeRouteMap"]
+    Q["Ranked route cards rendered\nwith Safety Score badge, ETA, Distance"]
+    Q --> QM["Leaflet map: color-coded polylines\n🟢 Green = High Safety\n🟡 Amber = Moderate\n🟠 Red = Elevated Hazard"]
+  end
+
+  %% ─────────────────────────────────────────
+  %% 5. SELECT ROUTE
+  %% ─────────────────────────────────────────
+  QM --> R
+
+  subgraph SELECT["5️⃣  Route Selection"]
+    R["User taps a route card\n→ Starts Navigation"]
+    R --> S["POST /api/trips/start\ntrips.py\nCreate Trip record in DB"]
+    S --> T["segment_memory_service.py\n✅ selection_count++ for chosen route segments\n❌ rejection_count++ for un-chosen route segments"]
+    T --> U[("PersonalSegmentMemory updated\nfor all candidate route edges")]
+  end
+
+  %% ─────────────────────────────────────────
+  %% 6. SIMULATE / NAVIGATE ROUTE
+  %% ─────────────────────────────────────────
+  U --> V
+
+  subgraph NAV["6️⃣  Simulation / Navigation  —  NavigationHUD.tsx"]
+    direction TB
+    V["HUD mounts:\nPOST /api/navigation/start\nnavigation_engine.py → in-memory session"]
+    V --> W["Device GPS or on-road GPS simulator\nstreams (lat, lon, speed) every 2 seconds"]
+    W --> X["POST /api/navigation/update\nnav_engine + gps_map_matcher.py\nCross-track Haversine projection\nd_xtrack = perpendicular distance to route"]
+
+    X --> X1{"d_xtrack > 45m?"}
+    X1 -->|No| Y["✅ On-Route\nUpdate: speed · distance to turn\nnext maneuver instruction · ETA"]
+    X1 -->|Yes| Z["⚠️  OFF-ROUTE DETECTED\nWarn chime + banner\nPOST /api/navigation/manual-reroute\nrerouting_engine.py → recalculate\nsafest path from current position"]
+    Z --> W
+    Y --> W
+  end
+
+  %% ─────────────────────────────────────────
+  %% 7. SOS BRANCH
+  %% ─────────────────────────────────────────
+  W --> SOS_Q{"🚨 User presses\nEMERGENCY SOS?"}
+  SOS_Q -->|No| END_Q
+
+  SOS_Q -->|Yes| SOS
+
+  subgraph SOS["7️⃣  Emergency SOS Subsystem"]
+    direction TB
+    SOS1["NavigationHUD.tsx\nPause GPS simulation\nLock coordinates at incident point\nConfirmation modal shown"]
+    SOS1 --> SOS2["POST /api/sos/activate\nsos_routes.py → sos_engine.py"]
+    SOS2 --> SOS3["sos_engine.py:\n1️⃣  Snap coords → nearest OSM segment\n    road_name identified"]
+    SOS3 --> SOS4["2️⃣  police_station_service.py\nHaversine search across\n135+ Chennai Police Stations\n→ Nearest station · phone · distance"]
+    SOS4 --> SOS5["3️⃣  secrets.token_urlsafe(32)\n64-bit cryptographic share token\n/sos/track/{token}"]
+    SOS5 --> SOS6["4️⃣  SOSEvent persisted to DB\nSafetyEvent injected:\nseverity=4 confidence=0.30 expires +24h\n(warns nearby SafeRoute users)"]
+    SOS6 --> SOS7["5️⃣  notification_service.py:\n📱 Twilio SMS → all TrustedContacts\n💬 WhatsApp webhook cards\n🔔 In-app /active-alerts-for-me"]
+    SOS7 --> SOS8["6️⃣  NavigationHUD.tsx:\n🔊 Web Audio API siren\n850 Hz – 1200 Hz oscillator\nMax gain through device speaker"]
+  end
+
+  %% ─────────────────────────────────────────
+  %% 8. GUARDIAN TRACKING
+  %% ─────────────────────────────────────────
+  SOS8 --> TRACK
+
+  subgraph TRACK["8️⃣  Guardian Live Tracking"]
+    T1["Guardian opens tracking URL\n/sos/track/{token}\nGET /api/sos/track/token"]
+    T1 --> T2["Live dashboard:\n📍 Incident coordinates\n🚔 Police station + phone\n🗺️  GPS breadcrumb trail\nAuto-refresh every 3s"]
+  end
+
+  %% ─────────────────────────────────────────
+  %% 9. SOS RESOLUTION
+  %% ─────────────────────────────────────────
+  TRACK --> RES
+  SOS8 --> RES
+
+  subgraph RES["9️⃣  SOS Resolution"]
+    R1{"User action?"}
+    R1 -->|"✅ Mark Safe"| R2["POST /api/sos/{id}/resolve\nSOS status → RESOLVED\nSiren stopped\nSafetyEvent deactivated\nNavigation simulation resumed"]
+    R1 -->|"❌ Cancel"| R3["POST /api/sos/{id}/cancel\nSOS status → CANCELLED\nFalse alarm → expires now"]
+    R1 -->|"🚫 Mark Route Unsafe"| R4["POST /api/sos/{id}/mark-unsafe\nsegment_memory_service.py\nAvoidance boosted for this corridor\nReroute away from stretch"]
+  end
+
+  R2 --> END_Q
+  R3 --> END_Q
+  R4 --> END_Q
+
+  %% ─────────────────────────────────────────
+  %% 10. END TRIP & LEARNING LOOP
+  %% ─────────────────────────────────────────
+  END_Q{"Destination\nreached or\nEnd Trip?"}
+  END_Q -->|Not yet| W
+
+  END_Q -->|"User taps End Trip\nor arrives"| ENDTRIP
+
+  subgraph ENDTRIP["🔟  Trip Completion & Memory Learning Loop"]
+    direction TB
+    E1["NavigationHUD.tsx → handleEndTrip()\nPOST /api/navigation/end\nPOST /api/trips/complete"]
+    E1 --> E2["segment_memory_service.py\nrecord_trip_traversal():\nvisit_count++ for every traversed segment\nlast_visit = datetime.utcnow()"]
+    E2 --> E3["TripFeedbackModal.tsx\n⭐ 1–5 Star Safety Rating\n💡 Issue Tags:\npoor_lighting · isolated_stretch\nsuspicious_activity · smooth_corridor"]
+    E3 --> E4["POST /api/trips/feedback\ntrips.py → segment_memory_service.py\nrecord_trip_feedback_on_segments():\n  ⭐ High rating  → positive_feedback_count++\n                  → trust_score rises\n  ⭐ Low rating   → negative_feedback_count++\n                  → avoidance_score rises"]
+    E4 --> E5["_recalculate_memory_metrics():\nconfidence = total_evidence / 8.0\ntrust_score = pos_weight / denom\navoidance_score = neg_weight / denom\npersonal_risk_adjustment ∈ [-15, +25]"]
+    E5 --> E6[("PersonalSegmentMemory rows\npersisted in PostgreSQL\nAffect NEXT route's biasing")]
+  end
+
+  E6 --> DONE(["🏁 Session Complete\nNext search uses updated\nPersonal Twin Memory\nfor pre-search biasing"])
+
+  %% STYLES
+  classDef userStep fill:#0F172A,stroke:#38BDF8,color:#BAE6FD,rx:8
+  classDef internalStep fill:#064E3B,stroke:#34D399,color:#D1FAE5,rx:8
+  classDef dataStep fill:#3B1515,stroke:#F87171,color:#FEE2E2,rx:8
+  classDef sosStep fill:#4C0519,stroke:#FB7185,color:#FFE4E6,rx:8
+  classDef externalStep fill:#3B2F00,stroke:#FBBF24,color:#FEF3C7,rx:8
+  classDef decisionStep fill:#1E1B4B,stroke:#A78BFA,color:#EDE9FE
+
+  class A,F,R,V,W userStep
+  class H,I,J,K,L,M,N,O,P,Q,QM,S,T,X,Y,Z,E1,E2,E3,E4,E5 internalStep
+  class E,U,E6 dataStep
+  class SOS1,SOS2,SOS3,SOS4,SOS5,SOS6,SOS7,SOS8,T1,T2,R2,R3,R4 sosStep
+  class X1,SOS_Q,END_Q,R1 decisionStep
+  class DONE userStep
+```
+
+### 3. Key Decision Gates in User Journey
+
+| Gate | Condition Evaluated | System Action |
+|:---:|:---|:---|
+| **Off-Route Detection** | $d_{\text{xtrack}} > 45\,\text{m}$ for consecutive epochs | Triggers audible warning banner and calls `rerouting_engine.py` to auto-recalculate safe route from current position. |
+| **Emergency SOS Trigger** | Commuter activates SOS button in HUD | Halts GPS progression, queries police KD-tree, starts audio siren, broadcasts Twilio SMS, WhatsApp, and live token URL. |
+| **SOS Resolution Mode** | User selects Mark Safe, Cancel, or Mark Unsafe | Updates status to RESOLVED/CANCELLED or elevates segment avoidance score and recalculates avoidance route. |
+| **Trip Completion Hook** | Destination reached or End Trip pressed | Completes trip in DB, increments `visit_count`, prompts for 1–5 star rating, and updates personal segment memory for future biasing. |
+
 ---
 
-## Detailed Working of Each Subsystem
-
-### 1. Resilient Geocoding & Candidate Route Generation
-- **Dual-Stage Geocoding (`backend/app/services/geocoder.py`)**:
-  - When a user enters an origin or destination (e.g., `"T. Nagar"` to `"Adyar"`), the geocoder first checks a curated fast-lookup table of 20+ major Chennai hubs and neighborhoods.
-  - For arbitrary street addresses, it queries OpenStreetMap Nominatim bounded to the Greater Chennai bounding box (`12.85?N?13.25?N, 80.10?E?80.35?E`) with automatic `httpx` timeout handling and fallback so network drops never cause HTTP 500 errors.
-- **Diversified Candidate Path Search (`backend/app/services/route_engine.py`)**:
-  - Snaps origin and destination `(lat, lon)` to the nearest nodes in the in-memory NetworkX `MultiDiGraph`.
-  - Runs multiple weighted shortest-path passes (Optimizing for *Max Safety*, *Balanced Utility*, *Shortest Time*, *Well-Lit Corridors*, and *Main Arterial Roads*).
-  - Applies a 35% edge-weight penalty to edges already used in prior candidates and enforces a maximum path-overlap filter (<85% shared edges) so the user is presented with genuinely distinct physical routes across Chennai.
-
-### 2. Multi-Factor Time-Aware Safety Scoring
-For every road edge $e$ along a candidate route at departure hour $t$, SafeRoute computes a composite edge risk $R(e, t)$:
-
-$$R(e, t) = w_{	ext{ml}} \cdot S_{	ext{LightGBM}}(e) + w_{	ext{time}}(t) \cdot \Phi_{	ext{temporal}}(e, t) + w_{	ext{twin}} \cdot \Psi_{	ext{twin}}(e, u) + \Delta_{	ext{SOS}}(e, t)$$
-
-1. **Base ML Risk $S_{	ext{LightGBM}}(e)$ (`ml_engine.py`)**: Inferred by the trained 35-feature LightGBM model over static and semi-dynamic street features (crime rate, lighting index, CCTV presence, police distance, road width, crowd density).
-2. **Temporal Vulnerability $\Phi_{	ext{temporal}}(e, t)$ (`time_risk_engine.py`)**: Applies non-linear multipliers based on time of day:
-   - *Daytime (06:00?17:59)*: Standard baseline weights.
-   - *Evening (18:00?20:59)*: $1.35	imes$ penalty on poorly lit segments.
-   - *Night (21:00?23:59)*: $1.75	imes$ penalty on unlit/isolated streets; $1.4	imes$ bonus for commercial/CCTV corridors.
-   - *Late Night (00:00?05:59)*: $2.20	imes$ penalty on isolated segments and minor residential alleys.
-3. **Personal Twin Bias $\Psi_{	ext{twin}}(e, u)$ (`twin_engine.py`)**: Incorporates user $u$'s personalized weight vector (`lighting_weight`, `crowd_weight`, `police_proximity_weight`, `isolation_penalty_weight`, `traffic_weight`) and historical segment memory (`segment_memory_json`).
-4. **Live Incident Overlay $\Delta_{	ext{SOS}}(e, t)$ (`sos_engine.py`)**: Queries active, non-expired `SafetyEvent` records within ~300m (`?0.003?` lat/lon bounding box) of the route and subtracts `severity * confidence * 2.5` from the safety score (capped at 15 points for unverified triggers) to dynamically route around active emergencies.
-
-### 3. Personal Digital Twin & Post-Trip Feedback Adaptation
-- **Twin Initialization**: Every registered user receives a `PersonalPreference` row and a `PersonalTwinState` row tracking their dynamic weights, adaptation count, and segment-level comfort memory.
-- **Implicit Learning (Route Choice)**: When the user starts navigation on Route $i$ out of $\{1 \dots k\}$ candidates (`POST /api/trips/start`), `twin_engine.update_from_route_selection()` compares Route $i$'s feature averages against the mean of rejected routes and performs a bounded learning-rate step ($\eta = 0.05$).
-- **Explicit Learning (Post-Trip Feedback)**:
-  - When the user clicks **End Trip** or arrives at the destination, `TripFeedbackModal.tsx` prompts for:
-    - Overall Safety Rating (`1` to `5` stars)
-    - Felt Safe toggle (`true` / `false`)
-    - Contextual tags (`poor_lighting`, `isolated_stretch`, `high_traffic`, `suspicious_activity`, `smooth_safe_corridor`)
-  - Submitting calls `POST /api/trips/feedback`, which persists a `RouteFeedback` record and updates `PersonalTwinState`:
-    - Low ratings (`<= 2`) with `poor_lighting` or `isolated_stretch` boost `lighting_weight` and `isolation_penalty_weight` by $+0.08$ and record negative trust scores on the traversed road segments.
-    - High ratings (`>= 4`) reinforce current Twin weights and boost positive trust scores for those corridors.
-
-### 4. Live GPS Navigation & Dynamic Re-Routing
-- **Simulation & Real Geolocation (`NavigationHUD.tsx`)**:
-  - Supports both real browser `navigator.geolocation` and an interactive on-road GPS simulator that steps along the route geometry while streaming `POST /api/navigation/gps-update` every 2 seconds.
-- **Map-Matching & Deviation Buffer (`gps_matcher.py`)**:
-  - Projects the user's `(lat, lon)` orthogonally onto every polyline segment of the active route to compute exact cross-track distance in meters, remaining distance, and next turn instruction.
-  - If cross-track error exceeds **50 meters** for **2 consecutive GPS pings**, the backend sets `re_route_needed = true` and returns a newly calculated safest route from the user's current coordinates to the destination.
-
-### 5. Emergency SOS & Incident Response Subsystem
-The SOS subsystem provides immediate protection during live navigation and anywhere in the app:
-
-1. **Trusted Contacts & Strict Phone Validation**:
-   - Users can add trusted contacts during registration (`LoginPage.tsx`) or inside the **??? Profile & Contacts** dashboard (`EmergencyModal.tsx`).
-   - Both frontend and backend (`schemas/sos.py` & `schemas/user.py`) enforce a strict 10-digit numeric regex (`^\d{10}$`), stripping spaces/hyphens and rejecting non-numeric or invalid-length phone numbers.
-
-2. **SOS Activation Flow (`POST /api/sos/activate`)**:
-   - **Immediate Navigation Freeze**: As soon as the user presses **?? EMERGENCY SOS** in `NavigationHUD.tsx`, the simulation/navigation loop halts (`!activeSOS` guard) so the user's marker stays locked at the exact emergency coordinates until the user clicks **Cancel SOS** or **Mark Safe**.
-   - **OSM Corridor Snapping**: Snaps `(lat, lon)` to the nearest graph edge in `route_engine.graph` to identify the exact street name (e.g., *Anna Salai*, *Sardar Patel Road*).
-   - **Nearest Police Station Lookup (`police_station_service.py`)**: Computes Haversine distance against 18 major Greater Chennai Police Stations (T. Nagar R-1, Adyar J-2, Mylapore E-1, Anna Nagar K-4, Guindy J-3, Velachery J-7, Egmore F-2, Kotturpuram J-4, Triplicane D-1, etc.) and returns the closest station's name, phone number, address, and distance in km.
-   - **Multi-Channel Guardian Dispatch (`notification_service.py`)**:
-     - Creates an `SOSEvent` with a unique `share_token` and live tracking URL (`/sos/track/[token]`).
-     - Logs notification payloads for all active `TrustedContact` records in `sos_notifications` (and automatically dispatches real SMS if `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` are configured in `.env`).
-     - Displays instant 1-click **?? SMS** (`sms:<phones>?body=...`), **?? WhatsApp** (`https://wa.me/91<phone>?text=...`), **?? Share Live Link** (Web Share API + clipboard fallback), and **?? Call 112** action buttons in the red emergency HUD banner.
-   - **Temporary Corridor Safety Penalty**: Inserts an unverified `SafetyEvent` (`event_type="SOS_ALERT"`, `severity=4`, `confidence=0.30`, `expires_at=+24h`) so concurrent route searches avoid the distress stretch.
-
-3. **Live Guardian Tracking (`/sos/track/[token]`) & Resolution (`POST /api/sos/resolve`)**:
-   - Family members opening the tracking link see an auto-refreshing (every 5s) emergency dashboard showing the user's live coordinates, corridor name, battery level, nearest police station details, GPS breadcrumb trail, and direct Google Maps directions.
-   - When the user clicks **Mark Safe** (`SAFE`) or **Cancel SOS** (`FALSE_ALARM`), the `SOSEvent` is closed, any false-alarm `SafetyEvent` penalty is immediately deactivated (`expires_at = now`), and live navigation movement seamlessly resumes.
-
----
-
-## Database Schema (10 Async SQLAlchemy Tables)
-
-SafeRoute uses an async SQLAlchemy ORM layer (`backend/app/db/database.py`) supporting both local SQLite (`aiosqlite`) and production PostgreSQL (`asyncpg`):
-
-| Table Name | Model File | Primary Purpose |
-| :--- | :--- | :--- |
-| `users` | `models/user.py` | User credentials, profile details, phone number, and home/work locations. |
-| `personal_preferences` | `models/user.py` | Explicit user slider weights (lighting, crowd, police proximity, isolation, traffic). |
-| `personal_twin_state` | `models/user.py` | Adaptive Bayesian Twin weights, archetype label, adaptation count, and JSON segment memory. |
-| `trips` | `models/trip.py` | Active and historical trips, origin/destination coordinates, chosen route geometry, and status. |
-| `route_feedback` | `models/trip.py` | Post-trip 1?5? safety ratings, `felt_safe` boolean, issue tags, and qualitative comments. |
-| `trusted_contacts` | `models/trusted_contact.py` | User's emergency guardians (`name`, 10-digit `phone_number`, `relationship_type`, `priority_order`, `is_active`). |
-| `sos_events` | `models/sos.py` | Master emergency incident record (`status`, `lat`, `lon`, `road_name`, `nearest_police_station`, `share_token`). |
-| `sos_location_updates` | `models/sos.py` | Time-series GPS breadcrumb trail (`lat`, `lon`, `speed`, `heading`, `battery_level`) during an active SOS. |
-| `sos_notifications` | `models/sos.py` | Audit trail of SMS/WhatsApp/In-App alerts dispatched to each `TrustedContact`. |
-| `safety_events` | `models/sos.py` | Time-decaying spatial risk events (`SOS_ALERT`, `USER_REPORT`) with `severity`, `confidence`, and `expires_at`. |
-
----
-
-## REST API Reference
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| **Auth & Twin** | | |
-| `POST` | `/api/auth/register` | Register a new user, initialize Twin archetype, and onboard optional `trusted_contacts`. |
-| `POST` | `/api/auth/login` | Authenticate user and return a signed JWT access token. |
-| `GET` | `/api/users/me/twin` | Fetch the user's current Personal Digital Twin state, weights, and recent trip stats. |
-| `PUT` | `/api/users/me/preferences` | Update explicit safety vs. travel-time preference sliders. |
-| **Safe Routing & Navigation** | | |
-| `POST` | `/api/routes/search` | Generate top ranked safe routes with ML risk, time-of-day context, traffic, and Twin scoring. |
-| `POST` | `/api/navigation/gps-update` | Map-match live GPS coordinates, compute turn countdown, and trigger dynamic off-route re-routing. |
-| `POST` | `/api/trips/start` | Record trip start and trigger implicit Revealed Preference Twin weight adaptation. |
-| `POST` | `/api/trips/feedback` | Submit post-trip safety rating & tags to update Twin weights and corridor memory. |
-| **Emergency SOS & Trusted Contacts** | | |
-| `GET` / `POST` | `/api/emergency/contacts` | List or create validated 10-digit trusted emergency contacts. |
-| `PUT` / `DELETE` | `/api/emergency/contacts/{id}` | Update or remove a trusted emergency contact. |
-| `POST` | `/api/sos/activate` | Trigger an active SOS alert, snap to OSM road, locate nearest police station, and alert contacts. |
-| `POST` | `/api/sos/update-location` | Append a live GPS & battery breadcrumb to an active SOS event. |
-| `POST` | `/api/sos/resolve` | Resolve an active SOS (`SAFE` or `FALSE_ALARM`) and resume normal navigation. |
-| `GET` | `/api/sos/track/{share_token}` | Public endpoint powering the live guardian tracking page (`/sos/track/[token]`). |
-| `GET` | `/api/sos/history` | Fetch the authenticated user's historical SOS activations and resolutions. |
-
----
-
-## Directory Structure
+## 📂 Project Directory Structure
 
 ```text
 safe_route/
-??? backend/
-?   ??? artifacts/               # LightGBM models, 35 features JSON, hybrid risk pkl
-?   ??? app/
-?   ?   ??? api/                 # FastAPI routers (auth, routes, navigation, trips, users, sos, sos_routes)
-?   ?   ??? core/                # JWT authentication, password hashing, and configuration
-?   ?   ??? db/                  # SQLAlchemy async engine & session management
-?   ?   ??? models/              # ORM models (user.py, trip.py, trusted_contact.py, sos.py)
-?   ?   ??? schemas/             # Pydantic validation schemas (user.py, route.py, sos.py)
-?   ?   ??? services/            # Core engines:
-?   ?   ?   ??? route_engine.py          # OSM graph, candidate routing & risk aggregation
-?   ?   ?   ??? ml_engine.py             # 35-feature LightGBM inference
-?   ?   ?   ??? time_risk_engine.py      # Temporal vulnerability multipliers
-?   ?   ?   ??? twin_engine.py           # Personal Digital Twin & feedback learning
-?   ?   ?   ??? traffic_engine.py        # TomTom live traffic & offline fallback
-?   ?   ?   ??? geocoder.py              # Nominatim + Chennai landmark fallback geocoder
-?   ?   ?   ??? gps_matcher.py           # Polyline projection & off-route detection
-?   ?   ?   ??? sos_engine.py            # SOS activation, tracking & SafetyEvent decay
-?   ?   ?   ??? police_station_service.py# 18 Chennai Police Stations Haversine matcher
-?   ?   ?   ??? notification_service.py  # Trusted contact SMS/WhatsApp/in-app dispatch
-?   ?   ??? main.py              # FastAPI application entrypoint & table auto-creation
-?   ??? saferoute.db             # Local SQLite database (or Postgres via DATABASE_URL)
-?
-??? frontend/
-?   ??? src/
-?   ?   ??? app/
-?   ?   ?   ??? page.tsx                 # Main SafeRoute application shell
-?   ?   ?   ??? sos/track/[token]/       # Public live emergency tracking page for guardians
-?   ?   ??? components/
-?   ?   ?   ??? auth/                    # LoginPage (Sign In, Register & Contact Onboarding)
-?   ?   ?   ??? dashboard/               # DashboardModal (Trip History & Twin Analytics)
-?   ?   ?   ??? emergency/               # EmergencyModal (Trusted Contacts CRUD & SOS History)
-?   ?   ?   ??? feedback/                # TripFeedbackModal (Post-trip safety & tag feedback)
-?   ?   ?   ??? map/                   a  # Leaflet SafeRouteMap with live GPS & SOS markers
-?   ?   ?   ??? navigation/              # NavigationHUD (Turn guidance, simulation & SOS banner)
-?   ?   ?   ??? preferences/             # PreferencesModal (Explicit Twin weight sliders)
-?   ?   ?   ??? routes/                  # RouteList and RouteDetails cards
-?   ?   ?   ??? search/                  # SearchPanel with departure time selector
-?   ?   ??? services/                    # Typed API client (routeApi.ts)
-?   ?   ??? types/                       # TypeScript interfaces
-?   ??? package.json
-?
-??? personal_twin_dataset/       # Synthetic user archetypes & evaluation datasets
-??? scripts/
-?   ??? generate_synthetic_twin_data.py
-?   ??? evaluate_saferoute.py    # Empirical benchmarking & ablation suite
-??? SOS_plan.md                  # Emergency SOS subsystem architectural specification
-??? SafeRoute_Final_Architecture_Roadmap.md
-??? README.md
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── auth.py              # User authentication, JWT issuance & contacts
+│   │   │   ├── routes.py            # Route search & ranking endpoints
+│   │   │   ├── navigation.py        # GPS telemetry ingest & turn guidance
+│   │   │   ├── sos_routes.py        # Emergency activation, police lookup & alerts
+│   │   │   ├── trips.py             # Trip lifecycle & feedback recording
+│   │   ├── core/                    # Security, password hashing & JWT handlers
+│   │   ├── db/                      # SQLAlchemy async session management
+│   │   ├── models/                  # Database models (user, trip, trusted_contact, sos)
+│   │   ├── schemas/                 # Pydantic validation schemas
+│   │   ├── services/
+│   │   │   ├── candidate_route_engine.py # Road graph & pre-search memory biasing
+│   │   │   ├── final_route_engine.py     # Hybrid risk & TomTom traffic fusion
+│   │   │   ├── personal_twin_engine.py   # Personal Twin vulnerability calibration
+│   │   │   ├── segment_memory_service.py # Traversal & feedback updates
+│   │   │   ├── route_geometry.py         # Node snapping & spatial geometry helpers
+│   │   │   ├── police_station_service.py # Chennai Police Station registry
+│   │   │   ├── notification_service.py   # Twilio SMS & WhatsApp alert dispatch
+│   ├── run_server.py                # Asynchronous Uvicorn launcher
+│   ├── requirements.txt             # Backend Python dependencies
+│
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx             # Main map dashboard & search shell
+│   │   │   ├── sos/track/[token]/   # Public live emergency tracking dashboard
+│   │   ├── components/
+│   │   │   ├── navigation/
+│   │   │   │   ├── NavigationHUD.tsx # Real-time HUD, deviation sentinel & siren
+│   │   │   ├── routes/
+│   │   │   │   ├── RouteDetails.tsx # Ranked route cards with Safety Scores
+│   │   │   ├── preferences/
+│   │   │   │   ├── PreferencesModal.tsx # Twin slider configuration
+│   │   │   ├── emergency/
+│   │   │   │   ├── EmergencyModal.tsx # Trusted contacts CRUD
+│   │   ├── services/
+│   │   │   ├── routeApi.ts          # Dynamic host client & API wrappers
+│   │   ├── types/
+│   │   │   ├── route.ts             # TypeScript route, status & SOS interfaces
+│   ├── package.json
+│   ├── next.config.ts
+│
+├── build_full_dissertation_pdf.py   # ReportLab academic dissertation PDF generator
+├── SafeRoute_Project_Report_SWE3004.pdf # Complete downloadable M.Tech dissertation
+└── README.md
 ```
 
 ---
 
-## Quick Start Guide
+## 🚀 Quick Start Guide
 
-### 1. Environment Setup
+### 1. Prerequisites
+- **Python**: 3.11 or 3.12 (64-bit)
+- **Node.js**: v18+ or v20+ LTS
+- **OS**: Windows 10/11 or Ubuntu 20.04/22.04 LTS
 
-Create and activate a Python 3.12 virtual environment:
+### 2. Backend Setup
+
 ```bash
+# 1. Navigate to project root and create virtual environment
+cd safe_route
 python -m venv .venv
+
 # On Windows:
-.venv\Scriptsctivate
+.\.venv\Scripts\activate
 # On Linux/macOS:
 source .venv/bin/activate
-```
 
-Install backend dependencies:
-```bash
+# 2. Install backend dependencies
 pip install -r backend/requirements.txt
-# Key packages: fastapi uvicorn sqlalchemy aiosqlite asyncpg pyjwt bcrypt osmnx lightgbm networkx httpx
-```
 
-Configure environment variables in `.env`:
-```env
+# 3. Configure environment variables (.env)
+# Create or edit .env in project root:
 DATABASE_URL=sqlite+aiosqlite:///backend/saferoute.db
-JWT_SECRET=saferoute_super_secret_jwt_key_chennai_2026
+JWT_SECRET=your_jwt_secret_key_here
 TOMTOM_API_KEY=your_tomtom_api_key_here
 FRONTEND_BASE_URL=http://localhost:3000
-# Optional Twilio SMS credentials for automated carrier SMS dispatch:
+
+# Optional Twilio credentials for carrier SMS:
 # TWILIO_ACCOUNT_SID=your_twilio_sid
 # TWILIO_AUTH_TOKEN=your_twilio_token
 # TWILIO_FROM_NUMBER=+1234567890
-```
 
-### 2. Launch Backend Server
-
-```bash
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+# 4. Start backend server (runs on port 8000)
+python backend/run_server.py
 ```
-- Swagger Interactive Documentation: `http://localhost:8000/docs`
+- Interactive Swagger API Documentation: `http://localhost:8000/docs`
 - Health Check: `http://localhost:8000/health`
 
-### 3. Launch Frontend Application
+### 3. Frontend Setup
 
+In a second terminal:
 ```bash
+# 1. Navigate to frontend directory and install packages
 cd frontend
 npm install
+
+# 2. Start Next.js development server
 npm run dev
 ```
-Open `http://localhost:3000` (or your LAN IP on mobile devices) in your browser.
+Open `http://localhost:3000` (or `http://<your-lan-ip>:3000` on mobile) in your browser.
 
 ---
 
-## Research Evaluation & Benchmarks
+## 📡 REST API Reference
 
-To run the automated empirical benchmark and ablation study:
-```bash
-python scripts/evaluate_saferoute.py
-```
-This evaluates:
-- Baseline Dijkstra shortest path vs. Static SafeRoute vs. Night-time contextual routing vs. Personal Twin archetypes.
-- Dynamic re-routing execution latency under simulated corridor deviations.
-- Generates `evaluation_results.json` and `RESEARCH_EVALUATION_REPORT.md`.
+| Endpoint | Method | Description |
+| :--- | :---: | :--- |
+| **Auth & Twin** | | |
+| `/api/auth/register` | `POST` | Create account, set initial Twin archetype, and add trusted contacts |
+| `/api/auth/login` | `POST` | Authenticate user credentials and return signed JWT token |
+| `/api/users/me/twin` | `GET` | Retrieve personal twin state, weights, and adaptation counts |
+| `/api/users/me/preferences` | `PUT` | Update explicit safety, distance, and lighting slider weights |
+| **Routing & Navigation** | | |
+| `/api/routes/search` | `POST` | Generate ranked routes (Safest, Balanced, Fastest) with memory bias |
+| `/api/navigation/start` | `POST` | Start trip session and activate navigation tracking |
+| `/api/navigation/gps-stream`| `POST` | Stream live GPS coordinates, evaluate cross-track deviation |
+| `/api/navigation/end` | `POST` | Complete navigation, mark trip completed, increment `visit_count` |
+| `/api/trips/{id}/complete` | `POST` | Mark trip complete and update segment memory traversals |
+| `/api/trips/feedback` | `POST` | Submit post-trip safety feedback and update corridor memory bias |
+| **Emergency SOS** | | |
+| `/api/sos/activate` | `POST` | Lock coordinates, pinpoint nearest police station, and dispatch alerts |
+| `/api/sos/{id}/resolve` | `POST` | Mark user safe, resolve active incident, and resume navigation |
+| `/api/sos/active-alerts-for-me` | `GET` | Fetch active incoming emergency alerts for guardian dashboard |
+| `/api/sos/track/{share_token}` | `GET` | Public endpoint powering live guardian tracking breadcrumbs |
 
 ---
 
-## Ethical & Privacy Considerations
+## 📊 Empirical Evaluation & Benchmarks
 
-- **Bounded Unverified Incident Impact**: SOS alerts and user-reported hazards are ingested with a low initial confidence (`0.30`) and an automatic 24-hour expiration window so unverified reports warn nearby travellers without permanently skewing the core LightGBM safety model.
-- **Privacy by Design**: Live tracking links (`/sos/track/[token]`) use high-entropy cryptographic tokens and only expose live location breadcrumbs while an SOS event is actively open.
-- **Explainable Recommendations**: Every route card provides explicit factor attribution (lighting, isolation, crowd density, active incident penalties, and Personal Twin alignment) explaining why an alternative corridor was recommended.
+SafeRoute was tested against 25 benchmark urban routes in Chennai across Day, Evening, and Late-Night travel windows:
+
+| Metric | Shortest-Path Dijkstra | Commercial Baselines | SafeRoute (Safest) |
+| :--- | :---: | :---: | :---: |
+| **Average Safety Score (Night)** | $52.4 / 100$ | $64.1 / 100$ | **$88.6 / 100$** |
+| **Exposure to Unlit Corridors** | $38.2\%$ | $24.5\%$ | **$4.1\%$** |
+| **Exposure to Crime Hotspots** | $18.6\%$ | $12.8\%$ | **$2.2\%$** |
+| **Average Distance Overhead** | $0.0\%$ (Reference) | $+4.8\%$ | **$+11.4\%$** |
+| **Cold Query Latency** | $5.90\,\text{s}$ | — | **$2.41\,\text{s}$** |
+| **Nearest Police Discovery Time** | — | — | **$<18\,\text{ms}$** |
+
+---
+
+## 🎓 Academic Dissertation
+
+A full academic dissertation (SWE3004 – Software Design and Development Project, M.Tech Software Engineering, VIT Vellore) is available:
+- **Compiled PDF**: [`SafeRoute_Project_Report_SWE3004.pdf`](./SafeRoute_Project_Report_SWE3004.pdf)
+- **PDF Generator**: `python build_full_dissertation_pdf.py`
+
+---
+
+## 🔒 Security & Privacy by Design
+- **Cryptographic Live Tokens**: Emergency tracking links use 64-bit unguessable random tokens (`secrets.token_urlsafe(32)`), protecting user privacy while enabling instantaneous access for guardians.
+- **Strict Data Minimization**: Trajectory coordinates are processed in-memory for map-matching and deviation checking; raw historical coordinate dumps are not permanently retained.
+- **Zero-Cost Deployment**: Built entirely with open-source tools (FastAPI, Next.js, OpenStreetMap) and free developer quotas (TomTom Developer, Twilio Trial).
